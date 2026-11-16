@@ -135,12 +135,27 @@ def create_initial_data(now_str):
         rows.append(row)
     return {"last_reset_check": now_str, "reset_day": "목요일 06:00", "rows": rows}
 
-# 이전 버전 데이터 호환 및 누락 컬럼 자동 보정
+# 이전 버전 데이터 호환 및 누락 컬럼 자동 보정 (KeyError 완벽 방지)
 def ensure_schema(data):
+    now_str = datetime.now(KST).isoformat()
+    if not isinstance(data, dict) or "rows" not in data:
+        return create_initial_data(now_str)
+    data.setdefault("last_reset_check", now_str)
+    data.setdefault("reset_day", "목요일 06:00")
     for idx, row in enumerate(data.get("rows", [])):
         row.setdefault("id", idx)
+        row.setdefault("계정명", f"{idx+1}번")
+        row.setdefault("서버", "서버")
         row.setdefault("신뢰도", "🟡작업중")
+        row.setdefault("생활완료", False)
+        row.setdefault("생활기록시간", "")
         row.setdefault("생기수치", 10500)
+        row.setdefault("생기상태", "🔥 10,500 (수확 가능)")
+        row.setdefault("보석배", False)
+        row.setdefault("보석배시간", "")
+        row.setdefault("낙원", False)
+        row.setdefault("이벤", False)
+        row.setdefault("싱글", False)
         row.setdefault("카던큐브", "")
         row.setdefault("보석메모", "")
         for c in range(1, 7):
@@ -184,6 +199,7 @@ def save_data(data):
         f.write(json_str)
 
 def process_auto_updates(data):
+    data = ensure_schema(data) # 매번 스키마 먼저 검사해서 KeyError 원천 차단
     now = datetime.now(KST)
     changed = False
     
@@ -236,11 +252,12 @@ def process_auto_updates(data):
         save_data(data)
     return data
 
-if "loa_data" not in st.session_state:
-    st.session_state.loa_data = load_data()
+# 세션에 남아있는 옛날 버전 데이터와 충돌하지 않도록 v2 전용 키 사용
+if "loa_data_v2" not in st.session_state:
+    st.session_state.loa_data_v2 = load_data()
 
-st.session_state.loa_data = process_auto_updates(st.session_state.loa_data)
-data = st.session_state.loa_data
+st.session_state.loa_data_v2 = process_auto_updates(st.session_state.loa_data_v2)
+data = st.session_state.loa_data_v2
 
 st.title("🎮 나만의 게임 숙제 & 수익 관리 매니저")
 tab_loa, tab_maple, tab_gersang = st.tabs(["⚓ 로스트아크 (25서버)", "🍁 메이플스토리", "💰 천하제일상 거상"])
@@ -269,15 +286,8 @@ with tab_loa:
             st.rerun()
     with col_f4:
         if st.button("🔄 생기/시간 새로고침", use_container_width=True):
-            st.session_state.loa_data = process_auto_updates(data)
+            st.session_state.loa_data_v2 = process_auto_updates(data)
             st.rerun()
-
-    # 데이터프레임 구성 및 필터/정렬 적용
-    df = pd.DataFrame(data["rows"])
-    if only_todo:
-        df = df[(~df["생활완료"]) | (~df["보석배"])]
-    if sort_urgent:
-        df = df.sort_values(by=["생활완료", "생기수치", "보석배"], ascending=[True, False, True])
 
     display_cols = [
         "id", "계정명", "서버", "신뢰도", "생활완료", "생기상태",
@@ -285,8 +295,19 @@ with tab_loa:
         "카던큐브", "보석메모", "C1", "C2", "C3", "C4", "C5", "C6"
     ]
 
+    # 데이터프레임 구성 및 누락 컬럼 2중 방어
+    df = pd.DataFrame(data["rows"])
+    for col in display_cols:
+        if col not in df.columns:
+            df[col] = False if col in ["생활완료", "보석배", "낙원", "이벤", "싱글"] else "➖"
+
+    if only_todo:
+        df = df[(~df["생활완료"]) | (~df["보석배"])]
+    if sort_urgent:
+        df = df.sort_values(by=["생활완료", "생기수치", "보석배"], ascending=[True, False, True])
+
     column_config = {
-        "id": None, # ID 열은 화면에서 숨김 (정렬 시에도 원본 행을 정확히 찾기 위함)
+        "id": None,
         "계정명": st.column_config.TextColumn("계정명", width="small"),
         "서버": st.column_config.TextColumn("서버", width="small"),
         "신뢰도": st.column_config.SelectboxColumn("🛡️신뢰도", options=TRUST_OPTIONS, width="small"),
@@ -301,7 +322,6 @@ with tab_loa:
         "보석메모": st.column_config.TextColumn("💎보석/수익 메모", width="medium", help="모인 보석이나 판매 일정 메모"),
     }
     
-    # 방법 A: 1캐 ~ 6캐 드롭다운 컬럼 (가로폭 대폭 축소)
     for c in range(1, 7):
         column_config[f"C{c}"] = st.column_config.SelectboxColumn(
             f"⚔️{c}캐", options=RAID_OPTIONS, width="small"
@@ -325,34 +345,30 @@ with tab_loa:
         rid = int(edit_row["id"])
         orig = orig_map[rid]
 
-        # 텍스트 및 선택형 컬럼 업데이트
         for col in ["계정명", "서버", "신뢰도", "카던큐브", "보석메모", "C1", "C2", "C3", "C4", "C5", "C6"]:
             val = "" if pd.isna(edit_row[col]) else str(edit_row[col])
             if orig.get(col, "") != val:
                 orig[col] = val
                 changed = True
 
-        # 생활 체크 감지 -> 완료 시간 기록
         if orig["생활완료"] != bool(edit_row["생활완료"]):
             orig["생활완료"] = bool(edit_row["생활완료"])
             orig["생활기록시간"] = now.isoformat() if orig["생활완료"] else ""
             changed = True
 
-        # 보석배 체크 감지 -> 수령 시간 기록
         if orig["보석배"] != bool(edit_row["보석배"]):
             orig["보석배"] = bool(edit_row["보석배"])
             orig["보석배시간"] = now.strftime("%m/%d %H:%M") if orig["보석배"] else ""
             changed = True
 
-        # 단답형 체크박스 업데이트
         for k in ["낙원", "이벤", "싱글"]:
             if orig[k] != bool(edit_row[k]):
                 orig[k] = bool(edit_row[k])
                 changed = True
 
     if changed:
-        st.session_state.loa_data = process_auto_updates(data)
-        save_data(st.session_state.loa_data)
+        st.session_state.loa_data_v2 = process_auto_updates(data)
+        save_data(st.session_state.loa_data_v2)
         st.rerun()
 
 with tab_maple:

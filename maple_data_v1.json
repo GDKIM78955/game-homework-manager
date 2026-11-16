@@ -87,10 +87,17 @@
     "crafts_per_recipe": 30.0,
     "bottle_etc_price": 15.0
   },
-  "meso_rate_logs": [],
+  "meso_rate_logs": [
+    {
+      "id": 1,
+      "날짜": "2026-11-16 23:28",
+      "시세(1억당메포)": 2093.0,
+      "메모": ""
+    }
+  ],
   "meso_market_cfg": {
     "shift_pct": 0.0,
     "band_threshold": 5.0,
-    "current_watch_rate": 2400.0
+    "current_watch_rate": 2093.0
   }
 }

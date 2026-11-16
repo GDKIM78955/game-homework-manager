@@ -1914,7 +1914,7 @@ with tab_maple:
                     else:
                         scissors_cost = 0.0
                 with sc_c2:
-                    market_ valuation_shift = st.number_input(
+                    market_valuation_shift = st.number_input(
                         "🎚️ 완제품 시장 시세 보정 / 직작 감가율 (%)",
                         min_value=-70.0, max_value=100.0, value=0.0, step=5.0, format="%.1f",
                         help="예: 비수기이거나 완제품 감가가 있어서 직작 원가의 80%(-20%)가 적정 시세라면 -20을 입력하세요!"
@@ -2752,4 +2752,3 @@ with tab_maple:
                         st.session_state.mp_dirty = True
                         st.session_state.mp_editor_ver += 1
                         st.rerun()
-                        

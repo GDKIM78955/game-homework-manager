@@ -330,6 +330,12 @@ def process_loa_updates(data):
 # ==============================================================================
 # 💰 2. 거상 데이터 및 로직 (단위: 만 전)
 # ==============================================================================
+PROFIT_LINK_OPTS = [
+    "합산 안 함 (2클라 자체 자금만)",
+    "이번 달 장사 순수익 합산",
+    "누적 전체 장사 순수익 합산"
+]
+
 def create_initial_gersang(today_str):
     return {
         "last_daily_date": today_str,
@@ -339,18 +345,19 @@ def create_initial_gersang(today_str):
             "hunt_goal": False
         },
         "client2_farm": {
-            "current_money": 0.0,      # 현재 보유 자금(만 전)
+            "current_money": 0.0,
+            "profit_link_mode": PROFIT_LINK_OPTS[0], # 장사 수익 합산 모드
             "drop_item_name": "주력 드랍템",
-            "drop_item_price": 10.0,   # 드랍템 개당 가격(만 전)
-            "drops_per_hour": 30.0,    # 시간당 평균 획득 개수
-            "extra_hourly_man": 500.0, # 시간당 추가 상재/부수입(만 전)
-            "daily_hours": 2.0,        # 하루 평균 반자사 가동 시간
+            "drop_item_price": 10.0,
+            "drops_per_hour": 30.0,
+            "extra_hourly_man": 500.0,
+            "daily_hours": 2.0,
             "targets": [
                 {"id": 1, "포함": True, "아이템명": "다음 단계 목표템 1 (클릭해 수정)", "목표가": 50000.0, "구매완료": False, "메모": "예: 5억 전"},
                 {"id": 2, "포함": True, "아이템명": "다음 단계 목표템 2 (클릭해 수정)", "목표가": 30000.0, "구매완료": False, "메모": "예: 3억 전"},
             ]
         },
-        "client1_trades": [] # 장사 매입/판매 전체 기록 (보유중 + 판매완료 통합 DB)
+        "client1_trades": []
     }
 
 def ensure_gersang_schema(data):
@@ -360,7 +367,6 @@ def ensure_gersang_schema(data):
     data.setdefault("last_daily_date", today_str)
     data.setdefault("daily_tasks", {"quest": False, "factory": False, "hunt_goal": False})
     
-    # 자정(00:00) 경과 시 거상 일일 숙제 자동 리셋
     if data["last_daily_date"] != today_str:
         for k in data["daily_tasks"]:
             data["daily_tasks"][k] = False
@@ -369,6 +375,9 @@ def ensure_gersang_schema(data):
 
     c2 = data.setdefault("client2_farm", {})
     c2.setdefault("current_money", 0.0)
+    c2.setdefault("profit_link_mode", PROFIT_LINK_OPTS[0])
+    if c2["profit_link_mode"] not in PROFIT_LINK_OPTS:
+        c2["profit_link_mode"] = PROFIT_LINK_OPTS[0]
     c2.setdefault("drop_item_name", "주력 드랍템")
     c2.setdefault("drop_item_price", 10.0)
     c2.setdefault("drops_per_hour", 30.0)
@@ -625,6 +634,18 @@ with tab_loa:
 with tab_gersang:
     render_game_timer("gersang", "천하제일상 거상", default_min=60)
 
+    # 장사 수익 데이터를 먼저 집계 (2클라 목표 자금 연동 스위치에서 바로 쓰기 위함)
+    trades = gs_data["client1_trades"]
+    now_kst = datetime.now(KST)
+    cur_ym = now_kst.strftime("%Y-%m")
+
+    holding_list = [t for t in trades if t.get("status") == "보유중"]
+    sold_list = [t for t in trades if t.get("status") == "판매완료"]
+
+    tied_capital = sum(float(t.get("buy_price", 0)) * int(t.get("qty", 1)) for t in holding_list)
+    this_month_profit = sum(float(t.get("net_profit", 0)) for t in sold_list if str(t.get("sell_date", "")).startswith(cur_ym))
+    total_profit = sum(float(t.get("net_profit", 0)) for t in sold_list)
+
     # 상단 일일 숙제 체크 (자정 자동 리셋) + 깃허브 백업 버튼
     with st.container(border=True):
         d_col1, d_col2, d_col3, d_col4, d_col5 = st.columns([1.3, 1.3, 1.3, 1.3, 1.5])
@@ -656,7 +677,6 @@ with tab_gersang:
 
     st.caption("💡 모든 금액 입력 기준은 **`만 전`**입니다. (예: `10000` 입력 시 자동으로 **`1억 전`**으로 계산 및 표시됩니다!)")
 
-    # 좌우 2단 분할: 왼쪽(2클라 반자사 스펙업 계산기) / 오른쪽(1클라 장사 가계부 & 시세 족보)
     col_left, col_right = st.columns([1.05, 1.45], gap="large")
 
     # --------------------------------------------------------------------------
@@ -667,14 +687,27 @@ with tab_gersang:
             st.subheader("🏹 2클라 (기마궁수) 스펙업 & 파밍 계산기")
             c2 = gs_data["client2_farm"]
 
-            # 1. 현재 보유 자금 & 파밍 효율 설정
             st.markdown("##### ⚙️ 1. 현재 자금 및 사냥터 드랍템 설정")
             f_c1, f_c2 = st.columns(2)
             with f_c1:
-                cur_money = st.number_input("💰 현재 보유 자금 (만 전)", min_value=0.0, value=float(c2["current_money"]), step=1000.0, format="%.0f")
+                cur_money = st.number_input("💰 2클라 자체 보유 자금 (만 전)", min_value=0.0, value=float(c2["current_money"]), step=1000.0, format="%.0f")
                 st.caption(f"👉 환산: **{fmt_man(cur_money)}**")
             with f_c2:
                 daily_hrs = st.number_input("⏰ 하루 평균 반자사 시간 (시간)", min_value=0.5, max_value=24.0, value=float(c2["daily_hours"]), step=0.5)
+
+            # ✨ 추가 기능 1: 1클라 장사 순수익 합산 스위치
+            link_mode = st.selectbox(
+                "🤝 1클라 장사 순수익을 2클라 목표 자금에 보태기",
+                options=PROFIT_LINK_OPTS,
+                index=PROFIT_LINK_OPTS.index(c2.get("profit_link_mode", PROFIT_LINK_OPTS[0]))
+            )
+            bonus_profit = 0.0
+            if link_mode == PROFIT_LINK_OPTS[1]:
+                bonus_profit = max(0.0, this_month_profit)
+                st.caption(f"✨ 이번 달 장사 순수익 **+{fmt_man(bonus_profit)}**이 목표 자금에 자동 합산됩니다!")
+            elif link_mode == PROFIT_LINK_OPTS[2]:
+                bonus_profit = max(0.0, total_profit)
+                st.caption(f"✨ 누적 전체 장사 순수익 **+{fmt_man(bonus_profit)}**이 목표 자금에 자동 합산됩니다!")
 
             f_c3, f_c4, f_c5 = st.columns(3)
             with f_c3:
@@ -686,12 +719,13 @@ with tab_gersang:
 
             extra_hr = st.number_input("🪙 시간당 추가 상재/부수입 (만 전, 없으면 0)", min_value=0.0, value=float(c2["extra_hourly_man"]), step=50.0, format="%.0f")
 
-            # 변경 감지 및 저장
             if (cur_money != c2["current_money"] or daily_hrs != c2["daily_hours"] or
+                link_mode != c2.get("profit_link_mode") or
                 drop_name != c2["drop_item_name"] or drop_price != c2["drop_item_price"] or
                 drops_hr != c2["drops_per_hour"] or extra_hr != c2["extra_hourly_man"]):
                 c2["current_money"] = cur_money
                 c2["daily_hours"] = daily_hrs
+                c2["profit_link_mode"] = link_mode
                 c2["drop_item_name"] = drop_name
                 c2["drop_item_price"] = drop_price
                 c2["drops_per_hour"] = drops_hr
@@ -701,7 +735,6 @@ with tab_gersang:
 
             st.divider()
 
-            # 2. 다음 단계 목표 아이템 장바구니
             st.markdown("##### 🎯 2. 다음 단계를 위해 구해야 할 목표 템 목록")
             st.caption("표 하단의 `+` 버튼을 눌러 목표 템을 추가하거나, 이름을 더블클릭해 수정하세요.")
 
@@ -724,7 +757,6 @@ with tab_gersang:
                 key=f"gs_target_editor_{st.session_state.gs_editor_ver}"
             )
 
-            # 목표 테이블 수정 반영
             new_targets = []
             for idx, r in edited_targets.iterrows():
                 if pd.isna(r["아이템명"]) or str(r["아이템명"]).strip() == "":
@@ -742,10 +774,11 @@ with tab_gersang:
                 save_json_local(GERSANG_FILE, gs_data)
                 st.session_state.gs_dirty = True
 
-            # 3. 실시간 목표 달성 시뮬레이션 결과
+            # 3. 실시간 목표 달성 시뮬레이션 결과 (장사 수익 합산 반영)
             active_targets = [t for t in c2["targets"] if t["포함"] and not t["구매완료"]]
             total_goal = sum(t["목표가"] for t in active_targets)
-            shortfall = max(0.0, total_goal - cur_money)
+            effective_money = cur_money + bonus_profit
+            shortfall = max(0.0, total_goal - effective_money)
             hourly_income = (drop_price * drops_hr) + extra_hr
             daily_income = hourly_income * daily_hrs
 
@@ -754,11 +787,15 @@ with tab_gersang:
             
             m1, m2 = st.columns(2)
             m1.metric("🎯 남은 목표 총액", fmt_man(total_goal), f"선택된 미구입 템 {len(active_targets)}개")
-            m2.metric("🔥 앞으로 더 필요한 금액", fmt_man(shortfall), "목표 달성!" if shortfall == 0 else f"현재 자금 {fmt_man(cur_money)} 제외")
+            m2.metric(
+                "🔥 앞으로 더 필요한 금액",
+                fmt_man(shortfall),
+                "목표 달성!" if shortfall == 0 else f"가용 자금 {fmt_man(effective_money)} 반영"
+            )
 
             if total_goal > 0:
-                prog = min(1.0, cur_money / total_goal)
-                st.progress(prog, text=f"목표 달성률: {prog*100:.1f}% ({fmt_man(cur_money)} / {fmt_man(total_goal)})")
+                prog = min(1.0, effective_money / total_goal)
+                st.progress(prog, text=f"목표 달성률: {prog*100:.1f}% ({fmt_man(effective_money)} / {fmt_man(total_goal)})")
 
             if shortfall > 0:
                 items_needed = math.ceil(shortfall / drop_price) if drop_price > 0 else 0
@@ -771,33 +808,20 @@ with tab_gersang:
                     f"👉 총 **`{hours_needed:.1f}시간`** 사냥 필요 (하루 {daily_hrs}시간 기준 약 **`{days_needed:.1f}일`** 소요 예상)"
                 )
             elif total_goal > 0:
-                st.success("🎉 현재 보유 자금으로 목표 아이템을 전부 구매할 수 있습니다! 다음 단계로 넘어가세요!")
+                st.success("🎉 현재 가용 자금(장사 수익 포함)으로 목표 아이템을 전부 구매할 수 있습니다!")
 
     # --------------------------------------------------------------------------
-    # 💰 [오른쪽] 1클라 장사 가계부 (수수료 2%, 매입 족보, 월별 수익 달력)
+    # 💰 [오른쪽] 1클라 장사 가계부 (분할 매도, 수수료 2%, 매입 족보, 월별 달력)
     # --------------------------------------------------------------------------
     with col_right:
         with st.container(border=True):
             st.subheader("💰 1클라 장사 가계부 & 시세 족보 (수수료 2% 자동 반영)")
-            trades = gs_data["client1_trades"]
-
-            # 1. 📅 상단 월별 수익 달력 (대시보드)
-            now_kst = datetime.now(KST)
-            cur_ym = now_kst.strftime("%Y-%m")
-
-            holding_list = [t for t in trades if t.get("status") == "보유중"]
-            sold_list = [t for t in trades if t.get("status") == "판매완료"]
-
-            tied_capital = sum(float(t.get("buy_price", 0)) * int(t.get("qty", 1)) for t in holding_list)
-            this_month_profit = sum(float(t.get("net_profit", 0)) for t in sold_list if str(t.get("sell_date", "")).startswith(cur_ym))
-            total_profit = sum(float(t.get("net_profit", 0)) for t in sold_list)
 
             k1, k2, k3 = st.columns(3)
             k1.metric(f"📅 이번 달({cur_ym}) 순수익", fmt_man(this_month_profit), "수수료 2% 공제 후")
             k2.metric("🔒 현재 묶인 재고 자금", fmt_man(tied_capital), f"보유 매물 {len(holding_list)}건")
             k3.metric("👑 누적 총 장사 순수익", fmt_man(total_profit), f"누적 판매 {len(sold_list)}건")
 
-            # 월별 달력 표 (판매 내역이 있을 때 월별로 자동 집계)
             if sold_list:
                 monthly_map = {}
                 for t in sold_list:
@@ -824,11 +848,7 @@ with tab_gersang:
 
             st.divider()
 
-            # 2. 📥 신규 매입(구매) 초간단 등록 바
             st.markdown("##### 📥 1. 물건 구매(매입) 등록하기")
-            # 기존에 샀던 아이템 이름들을 자동완성 힌트로 제공
-            known_items = sorted(list({t["item_name"] for t in trades if t.get("item_name")}))
-            
             b_c1, b_c2, b_c3, b_c4 = st.columns([2, 1.5, 1, 1.2])
             with b_c1:
                 in_item = st.text_input("아이템 이름", placeholder="예: 기린의뿔, 각성석", key="gs_in_item")
@@ -860,7 +880,6 @@ with tab_gersang:
                     else:
                         st.warning("아이템 이름을 입력해 주세요!")
 
-            # 입력 중인 아이템이 과거에 산 적이 있다면 즉시 족보(평단가/최고가) 브리핑 표시!
             if in_item.strip():
                 same_hist = [t for t in trades if t.get("item_name") == in_item.strip()]
                 if same_hist:
@@ -875,12 +894,11 @@ with tab_gersang:
 
             st.divider()
 
-            # 3. 📦 현재 보유 매물장 (판매 처리 시 여기서 사라지고 족보/달력으로 이동!)
-            st.markdown("##### 📦 2. 현재 보유 매물장 (팔렸을 때 `개당 판매가` 입력 후 `💰판매완료` 체크!)")
+            # ✨ 추가 기능 2: 묶음 매물의 분할 매도(부분 판매) 지원!
+            st.markdown("##### 📦 2. 현재 보유 매물장 (부분 판매 시 `✏️판 수량` 조절 후 `💰판매완료` 체크!)")
             if not holding_list:
                 st.info("현재 보유 중인 장사 매물이 없습니다. 위에서 구매한 물건을 등록해 보세요!")
             else:
-                # 아이템별 역대 평단가/최고가 계산 맵
                 item_stats = {}
                 for t in trades:
                     nm = t["item_name"]
@@ -899,17 +917,18 @@ with tab_gersang:
                     q = int(t.get("qty", 1))
                     avg_p = item_stats[nm]["sum"] / item_stats[nm]["q"]
                     max_p = item_stats[nm]["max"]
-                    breakeven = math.ceil(bp / 0.98) # 수수료 2% 제외 손익분기점
-                    rec_5 = math.ceil((bp * 1.05) / 0.98) # 순수익 5% 추천 판매가
+                    breakeven = math.ceil(bp / 0.98)
+                    rec_5 = math.ceil((bp * 1.05) / 0.98)
 
                     hold_rows.append({
                         "id": t["id"],
                         "아이템명": nm,
                         "산가격(만)": bp,
-                        "수량": q,
+                        "보유수량": q,
                         "내평균가(만)": round(avg_p, 1),
                         "내최고가(만)": max_p,
-                        "손익분기(2%)": f"{breakeven:,}만 (5%마진:{rec_5:,}만)",
+                        "손익분기(2%)": f"{breakeven:,}만 (5%:{rec_5:,}만)",
+                        "판수량": q, # 기본값은 전체 수량, 일부만 팔았을 때 숫자를 줄여서 분할 매도 가능!
                         "판매가입력(만)": bp if float(t.get("sell_price", 0)) == 0 else float(t["sell_price"]),
                         "판매완료": False,
                         "삭제": False
@@ -921,21 +940,21 @@ with tab_gersang:
                     column_config={
                         "id": None,
                         "아이템명": st.column_config.TextColumn("아이템명", width="small", disabled=True),
-                        "산가격(만)": st.column_config.NumberColumn("내가 산 가격", width="small", format="%d만", disabled=True),
-                        "수량": st.column_config.NumberColumn("수량", width="small", disabled=True),
-                        "내평균가(만)": st.column_config.NumberColumn("내 평단가", width="small", format="%d만", disabled=True, help="그동안 이 템을 산 평균 가격"),
-                        "내최고가(만)": st.column_config.NumberColumn("내 최고매입가", width="small", format="%d만", disabled=True, help="내가 가장 비싸게 주고 산 금액"),
-                        "손익분기(2%)": st.column_config.TextColumn("2%수수료 본전/추천가", width="medium", disabled=True),
+                        "산가격(만)": st.column_config.NumberColumn("산 가격", width="small", format="%d만", disabled=True),
+                        "보유수량": st.column_config.NumberColumn("보유수량", width="small", disabled=True),
+                        "내평균가(만)": st.column_config.NumberColumn("내 평단가", width="small", format="%d만", disabled=True),
+                        "내최고가(만)": st.column_config.NumberColumn("최고매입가", width="small", format="%d만", disabled=True),
+                        "손익분기(2%)": st.column_config.TextColumn("2%본전(5%추천)", width="medium", disabled=True),
+                        "판수량": st.column_config.NumberColumn("✏️판 수량", width="small", min_value=1, step=1, help="일부만 팔렸다면 팔린 개수만 입력하세요! 남은 수량은 자동으로 보유 목록에 남습니다."),
                         "판매가입력(만)": st.column_config.NumberColumn("✏️개당 판매가(만)", width="small", min_value=0.0, step=100.0, format="%d만"),
-                        "판매완료": st.column_config.CheckboxColumn("💰판매완료", width="small", help="체크 시 2% 수수료를 뺀 순수익이 월별 달력에 합산되고 목록에서 정리됩니다."),
-                        "삭제": st.column_config.CheckboxColumn("🗑️오입력삭제", width="small", help="잘못 입력한 기록을 완전히 지웁니다.")
+                        "판매완료": st.column_config.CheckboxColumn("💰판매완료", width="small"),
+                        "삭제": st.column_config.CheckboxColumn("🗑️삭제", width="small")
                     },
                     use_container_width=True,
                     hide_index=True,
                     key=f"gs_hold_editor_{st.session_state.gs_editor_ver}"
                 )
 
-                # 판매완료 및 삭제 처리 감지
                 trade_map = {t["id"]: t for t in trades}
                 hold_changed = False
                 for _, erow in edited_hold.iterrows():
@@ -950,15 +969,35 @@ with tab_gersang:
                     elif bool(erow["판매완료"]):
                         sp = float(erow["판매가입력(만)"])
                         bp = float(orig_t["buy_price"])
-                        q = int(orig_t.get("qty", 1))
-                        # 수수료 2% 공제 후 순수익 계산: (판매가 * 0.98 - 구매가) * 수량
-                        net = (sp * 0.98 - bp) * q
-                        orig_t["sell_price"] = sp
-                        orig_t["sell_date"] = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
-                        orig_t["net_profit"] = round(net, 1)
-                        orig_t["status"] = "판매완료"
+                        cur_q = int(orig_t.get("qty", 1))
+                        sell_q = max(1, min(cur_q, int(erow["판수량"])))
+                        net = round((sp * 0.98 - bp) * sell_q, 1)
+                        now_str_sell = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
+
+                        if sell_q < cur_q:
+                            # 분할 매도: 기존 보유 건의 수량만 차감하고, 팔린 수량만큼 판매완료 영수증을 새로 생성!
+                            orig_t["qty"] = cur_q - sell_q
+                            new_id = max([t.get("id", 0) for t in trades], default=0) + 1
+                            trades.append({
+                                "id": new_id,
+                                "item_name": orig_t["item_name"],
+                                "buy_price": bp,
+                                "qty": sell_q,
+                                "buy_date": orig_t.get("buy_date", ""),
+                                "status": "판매완료",
+                                "sell_price": sp,
+                                "sell_date": now_str_sell,
+                                "net_profit": net
+                            })
+                            st.toast(f"📦 [{orig_t['item_name']}] {sell_q}개 부분 판매 완료! (순수익: {fmt_man(net)} / 남은 수량: {cur_q - sell_q}개)")
+                        else:
+                            # 전량 매도
+                            orig_t["sell_price"] = sp
+                            orig_t["sell_date"] = now_str_sell
+                            orig_t["net_profit"] = net
+                            orig_t["status"] = "판매완료"
+                            st.toast(f"🎉 [{orig_t['item_name']}] {sell_q}개 전량 판매 완료! (순수익: {fmt_man(net)})")
                         hold_changed = True
-                        st.toast(f"🎉 [{orig_t['item_name']}] 판매 완료! (2% 수수료 제외 순수익: {fmt_man(net)})")
 
                 if hold_changed:
                     save_json_local(GERSANG_FILE, gs_data)
@@ -968,12 +1007,10 @@ with tab_gersang:
 
             st.divider()
 
-            # 4. 📖 나의 매입 족보 & 과거 거래 기록 검색기 (요청하신 핵심 기능!)
             with st.expander("📖 3. 나의 매입 족보 (그동안 샀던 모든 물건 평균가/최고가 & 과거 기록 꺼내보기)", expanded=False):
                 if not trades:
                     st.caption("아직 등록된 거래 내역이 없습니다.")
                 else:
-                    # 아이템별 전체 누적 족보 집계
                     jokbo_map = {}
                     for t in trades:
                         nm = t["item_name"]
@@ -1021,7 +1058,7 @@ with tab_gersang:
                         jokbo_df = jokbo_df[jokbo_df["아이템명"].str.contains(search_kw.strip(), case=False, na=False)]
                     st.dataframe(jokbo_df, use_container_width=True, hide_index=True)
 
-                    st.markdown("###### 📜 과거 개별 구매/판매 영수증 전체 기록 (판매 완료 건 포함)")
+                    st.markdown("###### 📜 과거 개별 구매/판매 영수증 전체 기록 (부분 판매 내역 포함)")
                     hist_rows = []
                     for t in sorted(trades, key=lambda x: x.get("id", 0), reverse=True):
                         if search_kw.strip() and search_kw.strip().lower() not in t["item_name"].lower():

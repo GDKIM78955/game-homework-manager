@@ -43,7 +43,7 @@
       "id": 1,
       "활성": true,
       "돈벌이명": "🧪 연금술: 경험 축적의 비약(경축비) 제작",
-      "원가(만)": 1800.0,
+      "원가(만)": 815.0,
       "판매가(만)": 2300.0,
       "시간당횟수": 40.0,
       "메모": "3명의 피로도 활용 시 효율 극대화"
@@ -52,7 +52,7 @@
       "id": 2,
       "활성": true,
       "돈벌이명": "🧪 연금술: 재물 획득의 비약(재획비) 제작",
-      "원가(만)": 1600.0,
+      "원가(만)": 680.0,
       "판매가(만)": 2050.0,
       "시간당횟수": 40.0,
       "메모": "씨앗/오일 시세 체크"
@@ -77,5 +77,20 @@
     }
   ],
   "saved_evals": [],
-  "maple_trades": []
+  "maple_trades": [],
+  "meso_market": [],
+  "alchemy_cfg": {
+    "oil_price": 45.0,
+    "crystal_price": 80.0,
+    "exp_recipe_price": 1500.0,
+    "drop_recipe_price": 1200.0,
+    "crafts_per_recipe": 30.0,
+    "bottle_etc_price": 15.0
+  },
+  "meso_rate_logs": [],
+  "meso_market_cfg": {
+    "shift_pct": 0.0,
+    "band_threshold": 5.0,
+    "current_watch_rate": 2400.0
+  }
 }

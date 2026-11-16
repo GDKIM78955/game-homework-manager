@@ -45,13 +45,11 @@ def render_game_timer(game_key, game_name, default_min=60):
             if st.button("▶️ 타이머 시작", key=f"start_{game_key}", use_container_width=True):
                 st.session_state[end_key] = datetime.now(KST).timestamp() * 1000 + int(mins * 60 * 1000)
                 st.session_state[run_key] = True
-                st.rerun()
         with c3:
             st.write("")
             if st.button("⏹️ 정지/초기화", key=f"stop_{game_key}", use_container_width=True):
                 st.session_state[run_key] = False
                 st.session_state[end_key] = None
-                st.rerun()
         with c4:
             if st.session_state[run_key] and st.session_state[end_key]:
                 target_ms = st.session_state[end_key]
@@ -164,7 +162,7 @@ def create_initial_data(now_str):
             "보석메모": "",
         }
         for c in range(1, 7):
-            row[f"LV{c}"] = "" # 캐릭터별 템렙/계승 메모 칸
+            row[f"LV{c}"] = ""
             row[f"CD{c}_pts"] = 100
             row[f"CD{c}_upd"] = now_str
             row[f"CD{c}_run"] = ""
@@ -197,7 +195,7 @@ def ensure_schema(data):
         row.setdefault("카던큐브", "")
         row.setdefault("보석메모", "")
         for c in range(1, 7):
-            row.setdefault(f"LV{c}", "") # 템렙 칸 자동 보정
+            row.setdefault(f"LV{c}", "")
             row.setdefault(f"CD{c}_pts", 100)
             row.setdefault(f"CD{c}_upd", now_str)
             row.setdefault(f"CD{c}_run", "")
@@ -223,7 +221,15 @@ def load_data():
         except Exception:
             return create_initial_data(now.isoformat())
 
-def save_data(data):
+# 로컬 즉시 저장 (클릭할 때마다 딜레이 0초로 반응)
+def save_local(data):
+    json_str = json.dumps(data, ensure_ascii=False, indent=2)
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        f.write(json_str)
+
+# 깃허브 원격 백업 저장
+def save_github(data):
+    save_local(data)
     json_str = json.dumps(data, ensure_ascii=False, indent=2)
     if "GITHUB_TOKEN" in st.secrets and "REPO_NAME" in st.secrets:
         try:
@@ -234,10 +240,11 @@ def save_data(data):
                 repo.update_file(contents.path, "Update LOA v3 data", json_str, contents.sha)
             except Exception:
                 repo.create_file(DATA_FILE, "Create LOA v3 data", json_str)
+            return True
         except Exception as e:
             st.error(f"GitHub 저장 오류: {e}")
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        f.write(json_str)
+            return False
+    return False
 
 def process_auto_updates(data):
     data = ensure_schema(data)
@@ -259,7 +266,6 @@ def process_auto_updates(data):
             row["이벤"] = False
             row["싱글"] = False
             for c in range(1, 7):
-                # 계승완료 표시가 아닌 일반 레이드 체크(1/3, 2/3, 3/3)만 주간 초기화
                 if row.get(f"C{c}") in ["1/3", "2/3", "✅3/3"]:
                     row[f"C{c}"] = "➖"
         data["last_reset_check"] = now.isoformat()
@@ -313,11 +319,15 @@ def process_auto_updates(data):
                 row[f"CD{c}"] = new_disp
 
     if changed:
-        save_data(data)
+        save_local(data)
     return data
 
 if "loa_data_v3" not in st.session_state:
     st.session_state.loa_data_v3 = load_data()
+if "editor_ver" not in st.session_state:
+    st.session_state.editor_ver = 0
+if "dirty" not in st.session_state:
+    st.session_state.dirty = False
 
 st.session_state.loa_data_v3 = process_auto_updates(st.session_state.loa_data_v3)
 data = st.session_state.loa_data_v3
@@ -328,12 +338,12 @@ tab_loa, tab_maple, tab_gersang = st.tabs(["⚓ 로스트아크 (25서버)", "�
 with tab_loa:
     render_game_timer("loa", "로스트아크", default_min=45)
 
-    # 필터 및 정렬 컨트롤 바
-    col_f1, col_f2, col_f3, col_f4 = st.columns([1.8, 1.5, 1.8, 1])
+    # 상단 컨트롤 및 저장 바
+    col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([1.6, 1.3, 1.5, 1.1, 1.3])
     with col_f1:
-        only_todo = st.checkbox("🔥 할 일 남음(생기 풀 / 보석배 미수령)만 보기", value=False)
+        only_todo = st.checkbox("🔥 할 일 남음(생기 풀/보석배)만 보기", value=False)
     with col_f2:
-        sort_urgent = st.checkbox("⚡ 생기 많이 찬 서버 맨 위로 정렬", value=False)
+        sort_urgent = st.checkbox("⚡ 생기 많은 순 정렬", value=False)
     with col_f3:
         reset_opt = st.radio(
             "주간 리셋 기준",
@@ -344,12 +354,21 @@ with tab_loa:
         )
         if reset_opt != data.get("reset_day"):
             data["reset_day"] = reset_opt
-            save_data(data)
-            st.rerun()
+            save_local(data)
+            st.session_state.dirty = True
     with col_f4:
-        if st.button("🔄 생기/휴게 새로고침", use_container_width=True):
+        if st.button("🔄 시간 새로고침", use_container_width=True):
             st.session_state.loa_data_v3 = process_auto_updates(data)
+            st.session_state.editor_ver += 1
             st.rerun()
+    with col_f5:
+        btn_label = "💾 깃허브 백업 저장 (미저장*)" if st.session_state.dirty else "💾 깃허브 백업 저장 (완료)"
+        btn_type = "primary" if st.session_state.dirty else "secondary"
+        if st.button(btn_label, type=btn_type, use_container_width=True):
+            if save_github(data):
+                st.session_state.dirty = False
+                st.toast("✅ 깃허브에 영구 저장이 완료되었습니다!")
+                st.rerun()
 
     # 👁️ 화면 가로폭 조절을 위한 표시 항목 선택 바
     col_v1, col_v2, col_v3, col_v4 = st.columns([1.2, 1.2, 1.2, 2.4])
@@ -362,20 +381,17 @@ with tab_loa:
     with col_v4:
         group_by_char = st.checkbox("👥 캐릭터별로 묶어서 배열 (1렙-1카-1캐 순서)", value=True)
 
-    # 선택한 옵션에 따라 표에 보여줄 컬럼 순서 구성
     display_cols = [
         "id", "계정명", "서버", "신뢰도", "생활완료", "생기상태",
         "보석배", "보석배시간", "낙원", "이벤", "싱글"
     ]
     
     if group_by_char:
-        # 1번 캐릭의 (템렙 -> 카던 -> 레이드)를 나란히 붙여서 한눈에 파악!
         for c in range(1, 7):
             if show_lv: display_cols.append(f"LV{c}")
             if show_cd: display_cols.append(f"CD{c}")
             if show_raid: display_cols.append(f"C{c}")
     else:
-        # 종류별로 모아서 보기
         if show_lv: display_cols.extend([f"LV{c}" for c in range(1, 7)])
         if show_cd: display_cols.extend([f"CD{c}" for c in range(1, 7)])
         if show_raid: display_cols.extend([f"C{c}" for c in range(1, 7)])
@@ -392,14 +408,15 @@ with tab_loa:
     if sort_urgent:
         df = df.sort_values(by=["생활완료", "생기수치", "보석배"], ascending=[True, False, True])
 
+    # 카던 드롭다운 옵션: 잘못 눌렀을 때도 언제든 복구할 수 있도록 명확한 명령어로 분리!
     base_cd_actions = [
         "⚡오늘돌았음(-1칸)",
-        "🔥5칸(풀)",
-        "🟡4칸",
-        "🟡3칸",
-        "⚪2칸",
-        "⚪1칸",
-        "⚪0칸",
+        "🔄5칸(풀)로 설정/복구",
+        "🔄4칸으로 설정",
+        "🔄3칸으로 설정",
+        "🔄2칸으로 설정",
+        "🔄1칸으로 설정",
+        "🔄0칸으로 설정",
         "➖(제외)"
     ]
     all_cd_vals = set(base_cd_actions)
@@ -426,33 +443,34 @@ with tab_loa:
     
     for c in range(1, 7):
         column_config[f"LV{c}"] = st.column_config.TextColumn(
-            f"📊{c}렙", width="small", help=f"{c}번 캐릭터 템렙 및 계승 현황 입력 (예: 1660, 1640계승중)"
+            f"📊{c}렙", width="small", help=f"{c}번 캐릭터 템렙 입력"
         )
         column_config[f"CD{c}"] = st.column_config.SelectboxColumn(
-            f"🌀{c}카", options=cd_options, width="small", help="카던 돌았을 때 '⚡오늘돌았음(-1칸)' 선택!"
+            f"🌀{c}카", options=cd_options, width="small", help="잘못 눌렀을 땐 '🔄N칸으로 설정/복구'를 선택하세요!"
         )
         column_config[f"C{c}"] = st.column_config.SelectboxColumn(
             f"⚔️{c}캐", options=RAID_OPTIONS, width="small"
         )
 
+    editor_key = f"loa_editor_v5_{st.session_state.editor_ver}"
     edited_df = st.data_editor(
         df[display_cols],
         column_config=column_config,
         use_container_width=True,
         hide_index=True,
         height=880,
-        key="loa_editor_v4"
+        key=editor_key
     )
 
     now = datetime.now(KST)
     changed = False
+    need_table_refresh = False
     orig_map = {r["id"]: r for r in data["rows"]}
 
     for _, edit_row in edited_df.iterrows():
         rid = int(edit_row["id"])
         orig = orig_map[rid]
 
-        # 텍스트 및 선택형 컬럼 업데이트 (표에 표시 중인 컬럼만 안전하게 반영)
         text_cols = ["계정명", "서버", "신뢰도", "카던큐브", "보석메모"]
         text_cols += [f"LV{c}" for c in range(1, 7)]
         text_cols += [f"C{c}" for c in range(1, 7)]
@@ -464,7 +482,7 @@ with tab_loa:
                     orig[col] = val
                     changed = True
 
-        # 카던 휴식게이지 조작 감지
+        # 카던 휴식게이지 조작 감지 (무한 루프 완벽 방지)
         for c in range(1, 7):
             col_cd = f"CD{c}"
             if col_cd in edit_row:
@@ -479,28 +497,38 @@ with tab_loa:
                         orig[f"CD{c}_pts"] = max(0, cur_pts - 20)
                         orig[f"CD{c}_run"] = now.isoformat()
                         orig[f"CD{c}_upd"] = (now + timedelta(days=1)).isoformat()
+                        orig[col_cd] = format_cd_display(orig[f"CD{c}_pts"], orig[f"CD{c}_run"], now)
+                        changed = True
+                        need_table_refresh = True
                     elif new_val == "➖(제외)":
                         orig[f"CD{c}_pts"] = -1
                         orig[f"CD{c}_run"] = ""
                         orig[f"CD{c}_upd"] = now.isoformat()
-                    else:
+                        orig[col_cd] = "➖(제외)"
+                        changed = True
+                    elif new_val.startswith("🔄"):
+                        # 잘못 눌러서 다시 원하는 칸수로 복구/수동 설정할 때
                         for b in range(6):
                             if f"{b}칸" in new_val:
                                 orig[f"CD{c}_pts"] = b * 20
+                                orig[f"CD{c}_run"] = "" # 잘못 눌렀던 오늘 완료 기록도 깔끔하게 초기화
                                 orig[f"CD{c}_upd"] = now.isoformat()
                                 break
-                    orig[col_cd] = format_cd_display(orig[f"CD{c}_pts"], orig[f"CD{c}_run"], now)
-                    changed = True
+                        orig[col_cd] = format_cd_display(orig[f"CD{c}_pts"], orig[f"CD{c}_run"], now)
+                        changed = True
+                        need_table_refresh = True
 
         if orig["생활완료"] != bool(edit_row["생활완료"]):
             orig["생활완료"] = bool(edit_row["생활완료"])
             orig["생활기록시간"] = now.isoformat() if orig["생활완료"] else ""
             changed = True
+            need_table_refresh = True
 
         if orig["보석배"] != bool(edit_row["보석배"]):
             orig["보석배"] = bool(edit_row["보석배"])
             orig["보석배시간"] = now.strftime("%m/%d %H:%M") if orig["보석배"] else ""
             changed = True
+            need_table_refresh = True
 
         for k in ["낙원", "이벤", "싱글"]:
             if orig[k] != bool(edit_row[k]):
@@ -509,8 +537,11 @@ with tab_loa:
 
     if changed:
         st.session_state.loa_data_v3 = process_auto_updates(data)
-        save_data(st.session_state.loa_data_v3)
-        st.rerun()
+        save_local(st.session_state.loa_data_v3)
+        st.session_state.dirty = True
+        if need_table_refresh:
+            st.session_state.editor_ver += 1
+            st.rerun()
 
 with tab_maple:
     render_game_timer("maple", "메이플스토리", default_min=30)

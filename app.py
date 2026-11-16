@@ -9,7 +9,7 @@ from github import Github
 st.set_page_config(page_title="통합 게임 숙제 & 타임 매니저", page_icon="🎮", layout="wide")
 
 KST = pytz.timezone('Asia/Seoul')
-DATA_FILE = "loa_data_v2.json"
+DATA_FILE = "loa_data_v3.json"
 
 # 25개 서버 초기 세팅
 DEFAULT_SERVERS = [
@@ -26,7 +26,7 @@ DEFAULT_SERVERS = [
 RAID_OPTIONS = ["➖", "1/3", "2/3", "✅3/3", "🔧계승중"]
 TRUST_OPTIONS = ["🟡작업중", "🟢안전", "🔴부족"]
 
-# ⏱️ 끊기지 않는 게임별 타이머 & 알람 위젯 함수
+# ⏱️ 끊기지 않는 게임별 타이머 & 알람 위젯
 def render_game_timer(game_key, game_name, default_min=60):
     end_key = f"timer_end_{game_key}"
     run_key = f"timer_run_{game_key}"
@@ -102,7 +102,12 @@ def render_game_timer(game_key, game_name, default_min=60):
             else:
                 st.info("👆 오늘 이 게임에 투자할 시간을 정하고 **[▶️ 타이머 시작]**을 누르세요.")
 
-# 최근 주간 초기화 시점 계산
+# 오전 6시 기준 로아 '게임 날짜' 계산 함수 (카던 휴게 자동 회복용)
+def get_loa_day(dt):
+    if dt.tzinfo is None:
+        dt = KST.localize(dt)
+    return (dt - timedelta(hours=6)).date()
+
 def get_last_weekly_reset(now, reset_weekday=3):
     days_since = (now.weekday() - reset_weekday) % 7
     candidate = (now - timedelta(days=days_since)).replace(hour=6, minute=0, second=0, microsecond=0)
@@ -110,7 +115,37 @@ def get_last_weekly_reset(now, reset_weekday=3):
         candidate -= timedelta(days=7)
     return candidate
 
+# 카던 휴게 표시 문자열 생성
+def format_cd_display(pts, run_str, now):
+    if pts < 0:
+        return "➖(제외)"
+    bars = pts // 20
+    half = ".5" if (pts % 20 >= 10) else ""
+    
+    # 오늘(오전 6시 이후) 돌았는지 확인
+    ran_today = False
+    short_date = ""
+    if run_str:
+        try:
+            rt = datetime.fromisoformat(run_str)
+            if rt.tzinfo is None:
+                rt = KST.localize(rt)
+            short_date = rt.strftime("%m/%d")
+            if get_loa_day(rt) == get_loa_day(now):
+                ran_today = True
+        except Exception:
+            pass
+
+    if ran_today:
+        return f"✅{bars}{half}칸 ({short_date}완료)"
+    if bars >= 5:
+        return "🔥5칸(풀)" if not short_date else f"🔥5칸 ({short_date})"
+    if bars >= 3:
+        return f"🟡{bars}{half}칸" + (f" ({short_date})" if short_date else "")
+    return f"⚪{bars}{half}칸" + (f" ({short_date})" if short_date else "")
+
 def create_initial_data(now_str):
+    now = datetime.fromisoformat(now_str)
     rows = []
     for idx, (acc, srv) in enumerate(DEFAULT_SERVERS):
         row = {
@@ -131,13 +166,17 @@ def create_initial_data(now_str):
             "보석메모": "",
         }
         for c in range(1, 7):
+            row[f"CD{c}_pts"] = 100 # 초기값: 한참 쉬었으므로 전원 5칸(100점) 세팅
+            row[f"CD{c}_upd"] = now_str
+            row[f"CD{c}_run"] = ""
+            row[f"CD{c}"] = format_cd_display(100, "", now)
             row[f"C{c}"] = "➖"
         rows.append(row)
     return {"last_reset_check": now_str, "reset_day": "목요일 06:00", "rows": rows}
 
-# 이전 버전 데이터 호환 및 누락 컬럼 자동 보정 (KeyError 완벽 방지)
 def ensure_schema(data):
-    now_str = datetime.now(KST).isoformat()
+    now = datetime.now(KST)
+    now_str = now.isoformat()
     if not isinstance(data, dict) or "rows" not in data:
         return create_initial_data(now_str)
     data.setdefault("last_reset_check", now_str)
@@ -159,9 +198,11 @@ def ensure_schema(data):
         row.setdefault("카던큐브", "")
         row.setdefault("보석메모", "")
         for c in range(1, 7):
-            if f"C{c}" not in row:
-                cnt = sum(1 for r in range(1, 4) if row.get(f"C{c}_R{r}", False))
-                row[f"C{c}"] = "✅3/3" if cnt == 3 else (f"{cnt}/3" if cnt > 0 else "➖")
+            row.setdefault(f"CD{c}_pts", 100) # 기본 5칸(100점)
+            row.setdefault(f"CD{c}_upd", now_str)
+            row.setdefault(f"CD{c}_run", "")
+            row.setdefault(f"CD{c}", format_cd_display(row[f"CD{c}_pts"], row[f"CD{c}_run"], now))
+            row.setdefault(f"C{c}", "➖")
     return data
 
 def load_data():
@@ -190,16 +231,16 @@ def save_data(data):
             repo = g.get_repo(st.secrets["REPO_NAME"])
             try:
                 contents = repo.get_contents(DATA_FILE)
-                repo.update_file(contents.path, "Update LOA v2 data", json_str, contents.sha)
+                repo.update_file(contents.path, "Update LOA v3 data", json_str, contents.sha)
             except Exception:
-                repo.create_file(DATA_FILE, "Create LOA v2 data", json_str)
+                repo.create_file(DATA_FILE, "Create LOA v3 data", json_str)
         except Exception as e:
             st.error(f"GitHub 저장 오류: {e}")
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         f.write(json_str)
 
 def process_auto_updates(data):
-    data = ensure_schema(data) # 매번 스키마 먼저 검사해서 KeyError 원천 차단
+    data = ensure_schema(data)
     now = datetime.now(KST)
     changed = False
     
@@ -209,7 +250,7 @@ def process_auto_updates(data):
     if last_check.tzinfo is None:
         last_check = KST.localize(last_check)
 
-    # 1. 주간 초기화 (생활, 신뢰도, 보석메모, 카던큐브 메모는 초기화에서 제외!)
+    # 1. 주간 초기화 (생활, 카던 휴식게이지, 신뢰도, 메모는 주간 초기화에서 제외!)
     if last_check < last_reset:
         for row in data["rows"]:
             row["보석배"] = False
@@ -248,25 +289,43 @@ def process_auto_updates(data):
             row["생기수치"] = 10500
             row["생기상태"] = "🔥 10,500 (수확 가능)"
 
+        # 3. 카던 휴식게이지 자동 회복 (오전 6시 기준 하루 지날 때마다 +10점 = 0.5칸 회복)
+        for c in range(1, 7):
+            pts = row.get(f"CD{c}_pts", 100)
+            if pts >= 0:
+                upd_str = row.get(f"CD{c}_upd", now.isoformat())
+                try:
+                    upd_dt = datetime.fromisoformat(upd_str)
+                except Exception:
+                    upd_dt = now
+                days_passed = (get_loa_day(now) - get_loa_day(upd_dt)).days
+                if days_passed > 0:
+                    new_pts = min(100, pts + days_passed * 10)
+                    if new_pts != pts:
+                        changed = True
+                    row[f"CD{c}_pts"] = new_pts
+                    row[f"CD{c}_upd"] = now.isoformat()
+            
+            new_disp = format_cd_display(row[f"CD{c}_pts"], row.get(f"CD{c}_run", ""), now)
+            if row.get(f"CD{c}") != new_disp:
+                row[f"CD{c}"] = new_disp
+
     if changed:
         save_data(data)
     return data
 
-# 세션에 남아있는 옛날 버전 데이터와 충돌하지 않도록 v2 전용 키 사용
-if "loa_data_v2" not in st.session_state:
-    st.session_state.loa_data_v2 = load_data()
+if "loa_data_v3" not in st.session_state:
+    st.session_state.loa_data_v3 = load_data()
 
-st.session_state.loa_data_v2 = process_auto_updates(st.session_state.loa_data_v2)
-data = st.session_state.loa_data_v2
+st.session_state.loa_data_v3 = process_auto_updates(st.session_state.loa_data_v3)
+data = st.session_state.loa_data_v3
 
 st.title("🎮 나만의 게임 숙제 & 수익 관리 매니저")
 tab_loa, tab_maple, tab_gersang = st.tabs(["⚓ 로스트아크 (25서버)", "🍁 메이플스토리", "💰 천하제일상 거상"])
 
 with tab_loa:
-    # 1. 상단 스탑워치/타이머 배치
     render_game_timer("loa", "로스트아크", default_min=45)
 
-    # 2. 필터 및 컨트롤 바
     col_f1, col_f2, col_f3, col_f4 = st.columns([1.8, 1.5, 1.8, 1])
     with col_f1:
         only_todo = st.checkbox("🔥 할 일 남음(생기 풀 / 보석배 미수령)만 보기", value=False)
@@ -285,17 +344,19 @@ with tab_loa:
             save_data(data)
             st.rerun()
     with col_f4:
-        if st.button("🔄 생기/시간 새로고침", use_container_width=True):
-            st.session_state.loa_data_v2 = process_auto_updates(data)
+        if st.button("🔄 생기/휴게 새로고침", use_container_width=True):
+            st.session_state.loa_data_v3 = process_auto_updates(data)
             st.rerun()
+
+    st.caption("💡 **카던 휴게 사용법:** 캐릭터별 `🌀1카~6카` 칸을 더블클릭해서 **`⚡오늘돌았음(-1칸)`**을 선택하면 자동으로 1칸이 까이고 오늘 날짜가 기록됩니다! (안 돌면 이틀마다 1칸씩 자동 회복)")
 
     display_cols = [
         "id", "계정명", "서버", "신뢰도", "생활완료", "생기상태",
         "보석배", "보석배시간", "낙원", "이벤", "싱글",
+        "CD1", "CD2", "CD3", "CD4", "CD5", "CD6",
         "카던큐브", "보석메모", "C1", "C2", "C3", "C4", "C5", "C6"
     ]
 
-    # 데이터프레임 구성 및 누락 컬럼 2중 방어
     df = pd.DataFrame(data["rows"])
     for col in display_cols:
         if col not in df.columns:
@@ -305,6 +366,22 @@ with tab_loa:
         df = df[(~df["생활완료"]) | (~df["보석배"])]
     if sort_urgent:
         df = df.sort_values(by=["생활완료", "생기수치", "보석배"], ascending=[True, False, True])
+
+    # 카던 드롭다운 옵션 구성 (현재 표시값 + 조작 메뉴)
+    base_cd_actions = [
+        "⚡오늘돌았음(-1칸)",
+        "🔥5칸(풀)",
+        "🟡4칸",
+        "🟡3칸",
+        "⚪2칸",
+        "⚪1칸",
+        "⚪0칸",
+        "➖(제외)"
+    ]
+    all_cd_vals = set(base_cd_actions)
+    for c in range(1, 7):
+        all_cd_vals.update(df[f"CD{c}"].dropna().unique().tolist())
+    cd_options = base_cd_actions + [x for x in sorted(all_cd_vals) if x not in base_cd_actions]
 
     column_config = {
         "id": None,
@@ -318,11 +395,14 @@ with tab_loa:
         "낙원": st.column_config.CheckboxColumn("🏝️낙원", width="small"),
         "이벤": st.column_config.CheckboxColumn("🎁이벤", width="small"),
         "싱글": st.column_config.CheckboxColumn("🪙싱글", width="small"),
-        "카던큐브": st.column_config.TextColumn("🎫카던/큐브", width="small", help="큐브 티켓 수나 카던 휴게 메모"),
+        "카던큐브": st.column_config.TextColumn("🎫큐브티켓", width="small", help="보유 큐브 티켓 메모"),
         "보석메모": st.column_config.TextColumn("💎보석/수익 메모", width="medium", help="모인 보석이나 판매 일정 메모"),
     }
     
     for c in range(1, 7):
+        column_config[f"CD{c}"] = st.column_config.SelectboxColumn(
+            f"🌀{c}카", options=cd_options, width="small", help="카던 돌았을 때 '⚡오늘돌았음(-1칸)' 선택!"
+        )
         column_config[f"C{c}"] = st.column_config.SelectboxColumn(
             f"⚔️{c}캐", options=RAID_OPTIONS, width="small"
         )
@@ -333,10 +413,9 @@ with tab_loa:
         use_container_width=True,
         hide_index=True,
         height=880,
-        key="loa_editor_v2"
+        key="loa_editor_v3"
     )
 
-    # 변경 사항 감지 및 원본 데이터(id 기준)에 즉시 반영
     now = datetime.now(KST)
     changed = False
     orig_map = {r["id"]: r for r in data["rows"]}
@@ -349,6 +428,35 @@ with tab_loa:
             val = "" if pd.isna(edit_row[col]) else str(edit_row[col])
             if orig.get(col, "") != val:
                 orig[col] = val
+                changed = True
+
+        # 카던 휴식게이지 조작 감지
+        for c in range(1, 7):
+            col_cd = f"CD{c}"
+            new_val = "" if pd.isna(edit_row[col_cd]) else str(edit_row[col_cd])
+            old_val = orig.get(col_cd, "")
+            
+            if new_val != old_val:
+                if new_val == "⚡오늘돌았음(-1칸)":
+                    cur_pts = orig.get(f"CD{c}_pts", 100)
+                    if cur_pts < 0:
+                        cur_pts = 100
+                    # 오늘 돌았으므로 1칸(20점) 차감 + 오늘치 자연회복 없도록 기준일을 내일로 세팅
+                    orig[f"CD{c}_pts"] = max(0, cur_pts - 20)
+                    orig[f"CD{c}_run"] = now.isoformat()
+                    orig[f"CD{c}_upd"] = (now + timedelta(days=1)).isoformat()
+                elif new_val == "➖(제외)":
+                    orig[f"CD{c}_pts"] = -1
+                    orig[f"CD{c}_run"] = ""
+                    orig[f"CD{c}_upd"] = now.isoformat()
+                else:
+                    # 수동으로 0칸~5칸 직접 지정한 경우
+                    for b in range(6):
+                        if f"{b}칸" in new_val:
+                            orig[f"CD{c}_pts"] = b * 20
+                            orig[f"CD{c}_upd"] = now.isoformat()
+                            break
+                orig[col_cd] = format_cd_display(orig[f"CD{c}_pts"], orig[f"CD{c}_run"], now)
                 changed = True
 
         if orig["생활완료"] != bool(edit_row["생활완료"]):
@@ -367,8 +475,8 @@ with tab_loa:
                 changed = True
 
     if changed:
-        st.session_state.loa_data_v2 = process_auto_updates(data)
-        save_data(st.session_state.loa_data_v2)
+        st.session_state.loa_data_v3 = process_auto_updates(data)
+        save_data(st.session_state.loa_data_v3)
         st.rerun()
 
 with tab_maple:

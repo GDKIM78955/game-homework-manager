@@ -7,11 +7,12 @@ from datetime import datetime, timedelta
 import pytz
 from github import Github
 
-st.set_page_config(page_title="통합 게임 숙제 & 타임 매니저", page_icon="🎮", layout="wide")
+st.set_page_config(page_title="통합 게임 숙제 & 수익 매니저", page_icon="🎮", layout="wide")
 
 KST = pytz.timezone('Asia/Seoul')
 LOA_FILE = "loa_data_v3.json"
 GERSANG_FILE = "gersang_data_v1.json"
+MAPLE_FILE = "maple_data_v1.json"
 
 # 로아 25개 서버 초기 세팅
 DEFAULT_SERVERS = [
@@ -28,27 +29,27 @@ DEFAULT_SERVERS = [
 RAID_OPTIONS = ["➖", "1/3", "2/3", "✅3/3", "🔧계승중", "✅계승완료"]
 TRUST_OPTIONS = ["🟡작업중", "🟢안전", "🔴부족"]
 
-# 💰 거상 '만 전' 단위를 보기 쉽게 '억/만 전'으로 변환해 주는 함수
-def fmt_man(val):
+# 💰 '만' 단위를 보기 쉽게 '억/만'으로 변환해 주는 공통 함수 (거상: 만 전 / 메이플: 만 메소)
+def fmt_man(val, unit="전"):
     try:
         v = float(val)
     except Exception:
-        return "0만 전"
+        return f"0만 {unit}"
     sign = "-" if v < 0 else ""
     v_abs = abs(v)
     eok = int(v_abs // 10000)
     man = v_abs % 10000
     if eok > 0:
         if man == 0:
-            return f"{sign}{eok:,}억 전"
+            return f"{sign}{eok:,}억 {unit}"
         elif man.is_integer():
-            return f"{sign}{eok:,}억 {int(man):,}만 전"
+            return f"{sign}{eok:,}억 {int(man):,}만 {unit}"
         else:
-            return f"{sign}{eok:,}억 {man:,.1f}만 전"
+            return f"{sign}{eok:,}억 {man:,.1f}만 {unit}"
     else:
         if man.is_integer():
-            return f"{sign}{int(man):,}만 전"
-        return f"{sign}{man:,.1f}만 전"
+            return f"{sign}{int(man):,}만 {unit}"
+        return f"{sign}{man:,.1f}만 {unit}"
 
 # ⏱️ 끊기지 않는 게임별 타이머 & 알람 위젯
 def render_game_timer(game_key, game_name, default_min=60):
@@ -147,6 +148,7 @@ def save_json_github(filename, data, commit_msg):
             return False
     return False
 
+
 # ==============================================================================
 # ⚓ 1. 로스트아크 데이터 및 로직
 # ==============================================================================
@@ -155,9 +157,9 @@ def get_loa_day(dt):
         dt = KST.localize(dt)
     return (dt - timedelta(hours=6)).date()
 
-def get_last_weekly_reset(now, reset_weekday=3):
+def get_last_weekly_reset(now, reset_weekday=3, reset_hour=6):
     days_since = (now.weekday() - reset_weekday) % 7
-    candidate = (now - timedelta(days=days_since)).replace(hour=6, minute=0, second=0, microsecond=0)
+    candidate = (now - timedelta(days=days_since)).replace(hour=reset_hour, minute=0, second=0, microsecond=0)
     if candidate > now:
         candidate -= timedelta(days=7)
     return candidate
@@ -261,7 +263,7 @@ def process_loa_updates(data):
     now = datetime.now(KST)
     changed = False
     reset_weekday = 3 if data.get("reset_day", "목요일 06:00").startswith("목") else 2
-    last_reset = get_last_weekly_reset(now, reset_weekday)
+    last_reset = get_last_weekly_reset(now, reset_weekday, 6)
     last_check = datetime.fromisoformat(data["last_reset_check"])
     if last_check.tzinfo is None:
         last_check = KST.localize(last_check)
@@ -339,11 +341,7 @@ PROFIT_LINK_OPTS = [
 def create_initial_gersang(today_str):
     return {
         "last_daily_date": today_str,
-        "daily_tasks": {
-            "quest": False,
-            "factory": False,
-            "hunt_goal": False
-        },
+        "daily_tasks": {"quest": False, "factory": False, "hunt_goal": False},
         "client2_farm": {
             "current_money": 0.0,
             "profit_link_mode": PROFIT_LINK_OPTS[0],
@@ -366,7 +364,6 @@ def ensure_gersang_schema(data):
         return create_initial_gersang(today_str)
     data.setdefault("last_daily_date", today_str)
     data.setdefault("daily_tasks", {"quest": False, "factory": False, "hunt_goal": False})
-    
     if data["last_daily_date"] != today_str:
         for k in data["daily_tasks"]:
             data["daily_tasks"][k] = False
@@ -413,6 +410,174 @@ def load_gersang_data():
 
 
 # ==============================================================================
+# 🍁 3. 메이플스토리 데이터, 기댓값 확률 엔진 및 로직 (단위: 만 메소)
+# ==============================================================================
+# 레벨 구간별 1회 잠재능력 재설정 비용 (단위: 만 메소)
+MAPLE_CUBE_COST_TABLE = {
+    "윗잠 (잠재능력)": {
+        "120~150제 (보스장신구/루타비스)": {"레어": 36.0, "에픽": 144.0, "유니크": 340.0, "레전드리": 400.0},
+        "160제 (여명/앱솔랩스)": {"레어": 42.5, "에픽": 170.0, "유니크": 382.5, "레전드리": 450.0},
+        "200제 (아케인셰이드/칠흑)": {"레어": 45.0, "에픽": 180.0, "유니크": 425.0, "레전드리": 500.0},
+        "250제 (에테르넬/광휘)": {"레어": 50.0, "에픽": 200.0, "유니크": 467.5, "레전드리": 550.0},
+    },
+    "아랫잠 (에디셔널)": {
+        "120~150제 (보스장신구/루타비스)": {"레어": 110.0, "에픽": 308.0, "유니크": 748.0, "레전드리": 880.0},
+        "160제 (여명/앱솔랩스)": {"레어": 115.0, "에픽": 322.0, "유니크": 782.0, "레전드리": 920.0},
+        "200제 (아케인셰이드/칠흑)": {"레어": 130.0, "에픽": 364.0, "유니크": 884.0, "레전드리": 1040.0},
+        "250제 (에테르넬/광휘)": {"레어": 145.0, "에픽": 406.0, "유니크": 986.0, "레전드리": 1160.0},
+    }
+}
+
+# 등급업 기본 확률 (미라클 타임 시 2배 적용)
+MAPLE_TIERUP_RATES = {
+    "윗잠 (잠재능력)": {"레어->에픽": 0.047619, "에픽->유니크": 0.019608, "유니크->레전드리": 0.007},
+    "아랫잠 (에디셔널)": {"레어->에픽": 0.023810, "에픽->유니크": 0.009804, "유니크->레전드리": 0.004975}
+}
+
+# 주요 목표 스탯(옵션)별 평균 등장 확률 (공식 확률 기반 표준 기댓값)
+MAPLE_OPTION_PRESETS = {
+    "[레전드리] 주스탯 21% 이상 (가성비 2줄+)": 1 / 28.0,
+    "[레전드리] 주스탯 24% 이상 (정옵 2줄+)": 1 / 48.0,
+    "[레전드리] 주스탯 27% 이상 (준3줄)": 1 / 95.0,
+    "[레전드리] 주스탯 30% 이상 (3줄 정옵)": 1 / 260.0,
+    "[레전드리] 주스탯 33% 이상 (극옵 3줄)": 1 / 680.0,
+    "[레전드리/장신구] 드랍 or 메획 1줄 (20%)": 1 / 11.0,
+    "[레전드리/장신구] 드랍+메획 총합 2줄 (드메템 핵심!)": 1 / 95.0,
+    "[레전드리/장신구] 드메 1줄 + 주스탯 2줄": 1 / 130.0,
+    "[레전드리/장갑] 크리티컬 데미지 1줄 + 주스탯": 1 / 22.0,
+    "[레전드리/장갑] 크리티컬 데미지 2줄 (16%+)": 1 / 175.0,
+    "[레전드리/모자] 쿨타임 감소 -2초 이상": 1 / 19.0,
+    "[레전드리/모자] 쿨타임 감소 -3초 이상": 1 / 85.0,
+    "[레전드리/모자] 쿨타임 감소 -4초 이상": 1 / 380.0,
+    "[레전드리/무보엠] 보공/방무/공마 유효 2줄": 1 / 16.0,
+    "[레전드리/무보엠] 보공/공마 유효 3줄 (방무 제외)": 1 / 145.0,
+    "[레전드리/무보엠] 공격력/마력 21% 이상 (2줄+)": 1 / 38.0,
+    "[레전드리/무보엠] 공격력/마력 30% 이상 (3줄)": 1 / 520.0,
+    "[유니크] 주스탯 15% ~ 18% (가성비 유니크 2줄)": 1 / 20.0,
+    "[에픽] 주스탯 9% ~ 12% (토드/부캐용 2줄)": 1 / 14.0,
+    "[아랫잠/에픽] 공/마 +10 또는 스탯 4% (에디 1.5~2줄)": 1 / 24.0,
+    "[아랫잠/유니크] 에디 공/마 15% or 주스탯 2줄": 1 / 65.0,
+    "[아랫잠/레전드리] 에디 공/마 21% or 주스탯 3줄": 1 / 190.0,
+    "[아랫잠/무보엠] 에디 공/마 2줄 (21%+)": 1 / 75.0,
+    "✏️ 직접 평균 시도 횟수 입력": None
+}
+
+TIER_ORDER = ["레어", "에픽", "유니크", "레전드리"]
+
+def calc_tierup_expected_cost(cube_type, lv_bracket, start_tier, target_tier, is_miracle=False):
+    s_idx = TIER_ORDER.index(start_tier)
+    t_idx = TIER_ORDER.index(target_tier)
+    if s_idx >= t_idx:
+        return 0.0, 0.0
+    total_cost = 0.0
+    total_tries = 0.0
+    for idx in range(s_idx, t_idx):
+        cur_t = TIER_ORDER[idx]
+        nxt_t = TIER_ORDER[idx + 1]
+        step_key = f"{cur_t}->{nxt_t}"
+        base_rate = MAPLE_TIERUP_RATES[cube_type][step_key]
+        eff_rate = min(1.0, base_rate * (2.0 if is_miracle else 1.0))
+        cost_per_try = MAPLE_CUBE_COST_TABLE[cube_type][lv_bracket][cur_t]
+        tries = 1.0 / eff_rate
+        total_tries += tries
+        total_cost += tries * cost_per_try
+    return total_cost, total_tries
+
+def create_initial_maple(now_str, today_str):
+    return {
+        "last_weekly_reset": now_str,
+        "last_daily_date": today_str,
+        "fee_rate": 0.03, # 기본 MVP 실버 이상 3% 수수료 (일반 5% 선택 가능)
+        "accounts": [
+            {"id": 1, "명의명": "1번 본계정 (루나 / 유니온 8500 / Lv.285)", "결정석완료": False, "결정석수익": 15000.0, "일일메소완료": False, "전문기술피로도": False, "메모": "본캐 주간보스 1캐릭 몰아주기"},
+            {"id": 2, "명의명": "2번 부계정 A (루나 / 유니온 2500 / Lv.284)", "결정석완료": False, "결정석수익": 12000.0, "일일메소완료": False, "전문기술피로도": False, "메모": "부계정 보스 & 피로도"},
+            {"id": 3, "명의명": "3번 부계정 B (루나 / 유니온 3000 / Lv.284)", "결정석완료": False, "결정석수익": 12000.0, "일일메소완료": False, "전문기술피로도": False, "메모": "부계정 보스 & 피로도"},
+        ],
+        "hunting_cfg": {
+            "pure_meso_hr": 5500.0,   # 1시간 순메소(만 메소)
+            "frag_price": 650.0,      # 솔 에르다 조각 오늘자 시세(만 메소)
+            "frags_per_hr": 15.0,     # 1시간 평균 조각 획득 개수
+            "extra_drops_hr": 300.0,  # 태정/물욕/기타 시간당 부수입(만 메소)
+            "consumable_hr": 400.0    # 재획비/경축비/익골 등 1시간 도핑 원가(만 메소)
+        },
+        "biz_methods": [
+            {"id": 1, "활성": True, "돈벌이명": "🧪 연금술: 경험 축적의 비약(경축비) 제작", "원가(만)": 1800.0, "판매가(만)": 2300.0, "시간당횟수": 40.0, "메모": "3명의 피로도 활용 시 효율 극대화"},
+            {"id": 2, "활성": True, "돈벌이명": "🧪 연금술: 재물 획득의 비약(재획비) 제작", "원가(만)": 1600.0, "판매가(만)": 2050.0, "시간당횟수": 40.0, "메모": "씨앗/오일 시세 체크"},
+            {"id": 3, "활성": True, "돈벌이명": "💍 장신구/장비 제작 & 합성 장사", "원가(만)": 3000.0, "판매가(만)": 4200.0, "시간당횟수": 15.0, "메모": "명장 유지 및 상급 결정 활용"},
+            {"id": 4, "활성": True, "돈벌이명": "🔨 에픽 2줄 토드 장사 (160/200제)", "원가(만)": 8000.0, "판매가(만)": 12500.0, "시간당횟수": 4.0, "메모": "수상한 큐브/장인의 큐브 활용"},
+        ],
+        "saved_evals": [], # 경매장 매물 vs 미라클 직작 비교 저장 목록
+        "maple_trades": [] # 메이플 장사 가계부 및 족보 기록
+    }
+
+def ensure_maple_schema(data):
+    now = datetime.now(KST)
+    now_str = now.isoformat()
+    today_str = now.strftime("%Y-%m-%d")
+    if not isinstance(data, dict) or "accounts" not in data:
+        return create_initial_maple(now_str, today_str)
+
+    data.setdefault("last_weekly_reset", now_str)
+    data.setdefault("last_daily_date", today_str)
+    data.setdefault("fee_rate", 0.03)
+    data.setdefault("saved_evals", [])
+    data.setdefault("maple_trades", [])
+
+    # 1. 메이플 주간 초기화: 매주 목요일 00:00 (수요일->목요일 자정)
+    last_w_reset = get_last_weekly_reset(now, reset_weekday=3, reset_hour=0)
+    try:
+        last_w_check = datetime.fromisoformat(data["last_weekly_reset"])
+        if last_w_check.tzinfo is None:
+            last_w_check = KST.localize(last_w_check)
+    except Exception:
+        last_w_check = now
+
+    changed = False
+    if last_w_check < last_w_reset:
+        for acc in data.get("accounts", []):
+            acc["결정석완료"] = False
+        data["last_weekly_reset"] = now_str
+        changed = True
+
+    # 2. 메이플 일일 초기화: 매일 자정 00:00
+    if data["last_daily_date"] != today_str:
+        for acc in data.get("accounts", []):
+            acc["일일메소완료"] = False
+            acc["전문기술피로도"] = False
+        data["last_daily_date"] = today_str
+        changed = True
+
+    h_cfg = data.setdefault("hunting_cfg", {})
+    h_cfg.setdefault("pure_meso_hr", 5500.0)
+    h_cfg.setdefault("frag_price", 650.0)
+    h_cfg.setdefault("frags_per_hr", 15.0)
+    h_cfg.setdefault("extra_drops_hr", 300.0)
+    h_cfg.setdefault("consumable_hr", 400.0)
+
+    data.setdefault("biz_methods", [])
+    if changed:
+        save_json_local(MAPLE_FILE, data)
+    return data
+
+def load_maple_data():
+    now = datetime.now(KST)
+    if "GITHUB_TOKEN" in st.secrets and "REPO_NAME" in st.secrets:
+        try:
+            g = Github(st.secrets["GITHUB_TOKEN"])
+            repo = g.get_repo(st.secrets["REPO_NAME"])
+            contents = repo.get_contents(MAPLE_FILE)
+            return ensure_maple_schema(json.loads(contents.decoded_content.decode("utf-8")))
+        except Exception:
+            return create_initial_maple(now.isoformat(), now.strftime("%Y-%m-%d"))
+    else:
+        try:
+            with open(MAPLE_FILE, "r", encoding="utf-8") as f:
+                return ensure_maple_schema(json.load(f))
+        except Exception:
+            return create_initial_maple(now.isoformat(), now.strftime("%Y-%m-%d"))
+
+
+# ==============================================================================
 # 세션 초기화
 # ==============================================================================
 if "loa_data_v3" not in st.session_state:
@@ -429,12 +594,24 @@ if "gs_dirty" not in st.session_state:
 if "gs_editor_ver" not in st.session_state:
     st.session_state.gs_editor_ver = 0
 
+if "maple_data" not in st.session_state:
+    st.session_state.maple_data = load_maple_data()
+if "mp_dirty" not in st.session_state:
+    st.session_state.mp_dirty = False
+if "mp_editor_ver" not in st.session_state:
+    st.session_state.mp_editor_ver = 0
+
 st.session_state.loa_data_v3 = process_loa_updates(st.session_state.loa_data_v3)
 loa_data = st.session_state.loa_data_v3
 gs_data = ensure_gersang_schema(st.session_state.gersang_data)
+mp_data = ensure_maple_schema(st.session_state.maple_data)
 
 st.title("🎮 나만의 게임 숙제 & 수익 관리 매니저")
-tab_loa, tab_gersang, tab_maple = st.tabs(["⚓ 로스트아크 (25서버)", "💰 천하제일상 거상 (2클라+장사)", "🍁 메이플스토리"])
+tab_loa, tab_gersang, tab_maple = st.tabs([
+    "⚓ 로스트아크 (25서버)",
+    "💰 천하제일상 거상 (2클라+장사)",
+    "🍁 메이플스토리 (3명의+판독기+장사)"
+])
 
 # ==============================================================================
 # 탭 1: 로스트아크 화면
@@ -677,9 +854,6 @@ with tab_gersang:
 
     col_left, col_right = st.columns([1.05, 1.45], gap="large")
 
-    # --------------------------------------------------------------------------
-    # 🏹 [왼쪽] 2클라 (기마궁수 반자사) 다음 단계 목표 계산기
-    # --------------------------------------------------------------------------
     with col_left:
         with st.container(border=True):
             st.subheader("🏹 2클라 (기마궁수) 스펙업 & 파밍 계산기")
@@ -733,8 +907,6 @@ with tab_gersang:
             st.divider()
 
             st.markdown("##### 🎯 2. 다음 단계를 위해 구해야 할 목표 템 목록")
-            st.caption("표 하단의 `+` 버튼을 눌러 목표 템을 추가하거나, 이름을 더블클릭해 수정하세요.")
-
             target_df = pd.DataFrame(c2["targets"])
             if target_df.empty:
                 target_df = pd.DataFrame(columns=["id", "포함", "아이템명", "목표가", "구매완료", "메모"])
@@ -780,14 +952,9 @@ with tab_gersang:
 
             st.divider()
             st.markdown("##### 📊 3. 목표 달성 자동 계산 결과")
-            
             m1, m2 = st.columns(2)
             m1.metric("🎯 남은 목표 총액", fmt_man(total_goal), f"선택된 미구입 템 {len(active_targets)}개")
-            m2.metric(
-                "🔥 앞으로 더 필요한 금액",
-                fmt_man(shortfall),
-                "목표 달성!" if shortfall == 0 else f"가용 자금 {fmt_man(effective_money)} 반영"
-            )
+            m2.metric("🔥 앞으로 더 필요한 금액", fmt_man(shortfall), "목표 달성!" if shortfall == 0 else f"가용 자금 {fmt_man(effective_money)} 반영")
 
             if total_goal > 0:
                 prog = min(1.0, effective_money / total_goal)
@@ -797,7 +964,6 @@ with tab_gersang:
                 items_needed = math.ceil(shortfall / drop_price) if drop_price > 0 else 0
                 hours_needed = shortfall / hourly_income if hourly_income > 0 else 0
                 days_needed = shortfall / daily_income if daily_income > 0 else 0
-
                 st.info(
                     f"🏹 **[{drop_name}] 단독 파밍 기준:** 앞으로 약 **`{items_needed:,}개`** 더 캐면 목표 금액 달성!\n\n"
                     f"⏱️ **현재 반자사 속도 기준 (시간당 {fmt_man(hourly_income)} / 하루 {fmt_man(daily_income)}):**\n"
@@ -806,9 +972,6 @@ with tab_gersang:
             elif total_goal > 0:
                 st.success("🎉 현재 가용 자금(장사 수익 포함)으로 목표 아이템을 전부 구매할 수 있습니다!")
 
-    # --------------------------------------------------------------------------
-    # 💰 [오른쪽] 1클라 장사 가계부 (직접 수정/복구/분할매도 완벽 지원!)
-    # --------------------------------------------------------------------------
     with col_right:
         with st.container(border=True):
             st.subheader("💰 1클라 장사 가계부 & 시세 족보 (수수료 2% 자동 반영)")
@@ -836,11 +999,7 @@ with tab_gersang:
                     mr["수익률"] = f"{(mr['순수익(만)'] / mr['총 매입원가(만)'] * 100):.1f}%" if mr["총 매입원가(만)"] > 0 else "0%"
                 
                 with st.expander("🗓️ 월별 장사 수익 달력 상세 보기 (클릭해서 열기/닫기)", expanded=True):
-                    st.dataframe(
-                        pd.DataFrame(m_rows)[["월(YYYY-MM)", "판매 건수", "순수익 환산", "수익률", "총 매입원가(만)", "총 매출(만)"]],
-                        use_container_width=True,
-                        hide_index=True
-                    )
+                    st.dataframe(pd.DataFrame(m_rows)[["월(YYYY-MM)", "판매 건수", "순수익 환산", "수익률", "총 매입원가(만)", "총 매출(만)"]], use_container_width=True, hide_index=True)
 
             st.divider()
 
@@ -858,15 +1017,9 @@ with tab_gersang:
                     if in_item.strip():
                         new_id = max([t.get("id", 0) for t in trades], default=0) + 1
                         trades.append({
-                            "id": new_id,
-                            "item_name": in_item.strip(),
-                            "buy_price": float(in_price),
-                            "qty": int(in_qty),
-                            "buy_date": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
-                            "status": "보유중",
-                            "sell_price": 0.0,
-                            "sell_date": "",
-                            "net_profit": 0.0
+                            "id": new_id, "item_name": in_item.strip(), "buy_price": float(in_price),
+                            "qty": int(in_qty), "buy_date": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
+                            "status": "보유중", "sell_price": 0.0, "sell_date": "", "net_profit": 0.0
                         })
                         save_json_local(GERSANG_FILE, gs_data)
                         st.session_state.gs_dirty = True
@@ -883,15 +1036,11 @@ with tab_gersang:
                     avg_b = sum(float(t.get("buy_price", 0)) * int(t.get("qty", 1)) for t in same_hist) / tot_q
                     max_b = max(float(t.get("buy_price", 0)) for t in same_hist)
                     min_b = min(float(t.get("buy_price", 0)) for t in same_hist)
-                    st.caption(
-                        f"💡 **[{in_item.strip()}] 내 과거 족보:** 평균 매입가 **{fmt_man(avg_b)}** | "
-                        f"최고 비싸게 산 금액 **{fmt_man(max_b)}** | 최저 매입가 **{fmt_man(min_b)}** (누적 {tot_q}개 거래)"
-                    )
+                    st.caption(f"💡 **[{in_item.strip()}] 내 과거 족보:** 평균 매입가 **{fmt_man(avg_b)}** | 최고 비싸게 산 금액 **{fmt_man(max_b)}** | 최저 매입가 **{fmt_man(min_b)}** (누적 {tot_q}개 거래)")
 
             st.divider()
 
-            # ✨ 업그레이드: 보유 매물장에서 아이템명, 산 가격, 보유수량을 더블클릭해 직접 수정 가능!
-            st.markdown("##### 📦 2. 현재 보유 매물장 (잘못 적은 이름/산 가격/보유수량도 더블클릭해 바로 수정 가능!)")
+            st.markdown("##### 📦 2. 현재 보유 매물장 (더블클릭해 이름/산 가격/수량 바로 수정 가능!)")
             if not holding_list:
                 st.info("현재 보유 중인 장사 매물이 없습니다. 위에서 구매한 물건을 등록해 보세요!")
             else:
@@ -903,8 +1052,7 @@ with tab_gersang:
                     bp = float(t.get("buy_price", 0))
                     item_stats[nm]["q"] += q
                     item_stats[nm]["sum"] += bp * q
-                    if bp > item_stats[nm]["max"]:
-                        item_stats[nm]["max"] = bp
+                    if bp > item_stats[nm]["max"]: item_stats[nm]["max"] = bp
 
                 hold_rows = []
                 for t in holding_list:
@@ -915,19 +1063,12 @@ with tab_gersang:
                     max_p = item_stats[nm]["max"]
                     breakeven = math.ceil(bp / 0.98)
                     rec_5 = math.ceil((bp * 1.05) / 0.98)
-
                     hold_rows.append({
-                        "id": t["id"],
-                        "아이템명": nm,
-                        "산가격(만)": bp,
-                        "보유수량": q,
-                        "내평균가(만)": round(avg_p, 1),
-                        "내최고가(만)": max_p,
-                        "손익분기(2%)": f"{breakeven:,}만 (5%:{rec_5:,}만)",
-                        "판수량": q,
+                        "id": t["id"], "아이템명": nm, "산가격(만)": bp, "보유수량": q,
+                        "내평균가(만)": round(avg_p, 1), "내최고가(만)": max_p,
+                        "손익분기(2%)": f"{breakeven:,}만 (5%:{rec_5:,}만)", "판수량": q,
                         "판매가입력(만)": bp if float(t.get("sell_price", 0)) == 0 else float(t["sell_price"]),
-                        "판매완료": False,
-                        "삭제": False
+                        "판매완료": False, "삭제": False
                     })
 
                 hold_df = pd.DataFrame(hold_rows)
@@ -935,13 +1076,13 @@ with tab_gersang:
                     hold_df,
                     column_config={
                         "id": None,
-                        "아이템명": st.column_config.TextColumn("✏️아이템명", width="small", help="오타가 났다면 더블클릭해서 바로 수정하세요!"),
-                        "산가격(만)": st.column_config.NumberColumn("✏️산 가격(만)", width="small", min_value=0.0, step=100.0, format="%d만", help="산 가격을 잘못 적었다면 더블클릭해서 바로 고치세요!"),
-                        "보유수량": st.column_config.NumberColumn("✏️보유수량", width="small", min_value=1, step=1, help="수량을 잘못 등록했다면 더블클릭해서 바로 고치세요!"),
+                        "아이템명": st.column_config.TextColumn("✏️아이템명", width="small"),
+                        "산가격(만)": st.column_config.NumberColumn("✏️산 가격(만)", width="small", min_value=0.0, step=100.0, format="%d만"),
+                        "보유수량": st.column_config.NumberColumn("✏️보유수량", width="small", min_value=1, step=1),
                         "내평균가(만)": st.column_config.NumberColumn("내 평단가", width="small", format="%d만", disabled=True),
                         "내최고가(만)": st.column_config.NumberColumn("최고매입가", width="small", format="%d만", disabled=True),
                         "손익분기(2%)": st.column_config.TextColumn("2%본전(5%추천)", width="medium", disabled=True),
-                        "판수량": st.column_config.NumberColumn("✏️판 수량", width="small", min_value=1, step=1, help="일부만 팔렸다면 팔린 개수만 입력하세요!"),
+                        "판수량": st.column_config.NumberColumn("✏️판 수량", width="small", min_value=1, step=1),
                         "판매가입력(만)": st.column_config.NumberColumn("✏️개당 판매가(만)", width="small", min_value=0.0, step=100.0, format="%d만"),
                         "판매완료": st.column_config.CheckboxColumn("💰판매완료", width="small"),
                         "삭제": st.column_config.CheckboxColumn("🗑️삭제", width="small")
@@ -956,26 +1097,21 @@ with tab_gersang:
                 for _, erow in edited_hold.iterrows():
                     tid = int(erow["id"])
                     orig_t = trade_map.get(tid)
-                    if not orig_t:
-                        continue
+                    if not orig_t: continue
                     if bool(erow["삭제"]):
                         trades.remove(orig_t)
                         hold_changed = True
-                        st.toast(f"🗑️ [{orig_t['item_name']}] 기록을 삭제했습니다.")
                         continue
 
-                    # 1. 아이템명 / 산 가격 / 보유수량 직접 수정 감지
                     new_nm = str(erow["아이템명"]).strip() if not pd.isna(erow["아이템명"]) else orig_t["item_name"]
                     new_bp = float(erow["산가격(만)"]) if not pd.isna(erow["산가격(만)"]) else float(orig_t["buy_price"])
                     new_bq = max(1, int(erow["보유수량"])) if not pd.isna(erow["보유수량"]) else int(orig_t.get("qty", 1))
-
                     if new_nm != orig_t["item_name"] or new_bp != float(orig_t["buy_price"]) or new_bq != int(orig_t.get("qty", 1)):
                         orig_t["item_name"] = new_nm
                         orig_t["buy_price"] = new_bp
                         orig_t["qty"] = new_bq
                         hold_changed = True
 
-                    # 2. 판매완료 처리 감지
                     if bool(erow["판매완료"]):
                         sp = float(erow["판매가입력(만)"])
                         bp = float(orig_t["buy_price"])
@@ -988,23 +1124,15 @@ with tab_gersang:
                             orig_t["qty"] = cur_q - sell_q
                             new_id = max([t.get("id", 0) for t in trades], default=0) + 1
                             trades.append({
-                                "id": new_id,
-                                "item_name": orig_t["item_name"],
-                                "buy_price": bp,
-                                "qty": sell_q,
-                                "buy_date": orig_t.get("buy_date", ""),
-                                "status": "판매완료",
-                                "sell_price": sp,
-                                "sell_date": now_str_sell,
-                                "net_profit": net
+                                "id": new_id, "item_name": orig_t["item_name"], "buy_price": bp, "qty": sell_q,
+                                "buy_date": orig_t.get("buy_date", ""), "status": "판매완료", "sell_price": sp,
+                                "sell_date": now_str_sell, "net_profit": net
                             })
-                            st.toast(f"📦 [{orig_t['item_name']}] {sell_q}개 부분 판매 완료! (순수익: {fmt_man(net)} / 남은 수량: {cur_q - sell_q}개)")
                         else:
                             orig_t["sell_price"] = sp
                             orig_t["sell_date"] = now_str_sell
                             orig_t["net_profit"] = net
                             orig_t["status"] = "판매완료"
-                            st.toast(f"🎉 [{orig_t['item_name']}] {sell_q}개 전량 판매 완료! (순수익: {fmt_man(net)})")
                         hold_changed = True
 
                 if hold_changed:
@@ -1015,7 +1143,7 @@ with tab_gersang:
 
             st.divider()
 
-            with st.expander("📖 3. 나의 매입 족보 & 과거 기록 수정/복구 (그동안 샀던 물건 평균가/최고가 및 영수증 관리)", expanded=False):
+            with st.expander("📖 3. 나의 매입 족보 & 과거 기록 수정/복구", expanded=False):
                 if not trades:
                     st.caption("아직 등록된 거래 내역이 없습니다.")
                 else:
@@ -1047,47 +1175,34 @@ with tab_gersang:
                         be_price = math.ceil(avg_buy / 0.98)
                         avg_sell_str = f"{int(jb['판매합계']/jb['판매수량']):,}만" if jb["판매수량"] > 0 else "판매전"
                         jokbo_rows.append({
-                            "아이템명": nm,
-                            "누적매입": f"{jb['총 매입수량']}개",
+                            "아이템명": nm, "누적매입": f"{jb['총 매입수량']}개",
                             "내 평균매입가": f"{int(avg_buy):,}만 ({fmt_man(avg_buy)})",
                             "최고비싸게산값": f"{int(jb['최고 매입가']):,}만",
                             "최저매입가": f"{int(jb['최저 매입가']):,}만",
-                            "2%본전판매가": f"{be_price:,}만",
-                            "평균판매가": avg_sell_str,
-                            "누적순수익": fmt_man(jb["누적 순수익"]),
-                            "최근매입일": jb["최근 거래일"]
+                            "2%본전판매가": f"{be_price:,}만", "평균판매가": avg_sell_str,
+                            "누적순수익": fmt_man(jb["누적 순수익"]), "최근매입일": jb["최근 거래일"]
                         })
 
-                    st.markdown("###### 📊 아이템별 시세 족보 요약표")
-                    search_kw = st.text_input("🔍 족보/과거기록 아이템 이름 검색 (비워두면 전체 보기)", key="gs_jokbo_search")
-                    
+                    search_kw = st.text_input("🔍 족보/과거기록 아이템 이름 검색", key="gs_jokbo_search")
                     jokbo_df = pd.DataFrame(jokbo_rows)
                     if search_kw.strip():
                         jokbo_df = jokbo_df[jokbo_df["아이템명"].str.contains(search_kw.strip(), case=False, na=False)]
                     st.dataframe(jokbo_df, use_container_width=True, hide_index=True)
 
-                    st.markdown("###### 📜 과거 개별 구매/판매 영수증 전체 기록 (여기서도 가격/수량 수정 및 보유중 복구 가능!)")
                     hist_rows = []
                     for t in sorted(trades, key=lambda x: x.get("id", 0), reverse=True):
                         if search_kw.strip() and search_kw.strip().lower() not in t["item_name"].lower():
                             continue
                         hist_rows.append({
-                            "id": t["id"],
-                            "상태": "🟢판매완료" if t.get("status") == "판매완료" else "📦보유중",
-                            "아이템명": t["item_name"],
-                            "수량": int(t.get("qty", 1)),
-                            "산가격(만)": float(t["buy_price"]),
-                            "판가격(만)": float(t.get("sell_price", 0.0)),
+                            "id": t["id"], "상태": "🟢판매완료" if t.get("status") == "판매완료" else "📦보유중",
+                            "아이템명": t["item_name"], "수량": int(t.get("qty", 1)),
+                            "산가격(만)": float(t["buy_price"]), "판가격(만)": float(t.get("sell_price", 0.0)),
                             "순수익": fmt_man(t.get("net_profit", 0)) if t.get("status") == "판매완료" else "-",
-                            "매입일시": t.get("buy_date", ""),
-                            "보유중복구": False,
-                            "삭제": False
+                            "매입일시": t.get("buy_date", ""), "보유중복구": False, "삭제": False
                         })
-                    
                     if hist_rows:
-                        hist_df = pd.DataFrame(hist_rows)
                         edited_hist = st.data_editor(
-                            hist_df,
+                            pd.DataFrame(hist_rows),
                             column_config={
                                 "id": None,
                                 "상태": st.column_config.TextColumn("상태", width="small", disabled=True),
@@ -1097,21 +1212,18 @@ with tab_gersang:
                                 "판가격(만)": st.column_config.NumberColumn("✏️판 가격(만)", width="small", min_value=0.0, step=100.0, format="%d만"),
                                 "순수익": st.column_config.TextColumn("순수익(2%제외)", width="small", disabled=True),
                                 "매입일시": st.column_config.TextColumn("매입일시", width="small", disabled=True),
-                                "보유중복구": st.column_config.CheckboxColumn("↩️보유중복구", width="small", help="실수로 판매완료를 눌렀다면 체크해서 다시 보유 매물장으로 되돌립니다."),
+                                "보유중복구": st.column_config.CheckboxColumn("↩️보유중복구", width="small"),
                                 "삭제": st.column_config.CheckboxColumn("🗑️삭제", width="small")
                             },
-                            use_container_width=True,
-                            hide_index=True,
+                            use_container_width=True, hide_index=True,
                             key=f"gs_hist_editor_{st.session_state.gs_editor_ver}"
                         )
-
                         trade_map = {t["id"]: t for t in trades}
                         hist_changed = False
                         for _, hrow in edited_hist.iterrows():
                             tid = int(hrow["id"])
                             orig_t = trade_map.get(tid)
-                            if not orig_t:
-                                continue
+                            if not orig_t: continue
                             if bool(hrow["삭제"]):
                                 trades.remove(orig_t)
                                 hist_changed = True
@@ -1123,12 +1235,10 @@ with tab_gersang:
                                 orig_t["net_profit"] = 0.0
                                 hist_changed = True
                                 continue
-
                             h_nm = str(hrow["아이템명"]).strip()
                             h_q = max(1, int(hrow["수량"]))
                             h_bp = float(hrow["산가격(만)"])
                             h_sp = float(hrow["판가격(만)"])
-
                             if (h_nm != orig_t["item_name"] or h_q != int(orig_t.get("qty", 1)) or
                                 h_bp != float(orig_t["buy_price"]) or h_sp != float(orig_t.get("sell_price", 0.0))):
                                 orig_t["item_name"] = h_nm
@@ -1138,7 +1248,6 @@ with tab_gersang:
                                 if orig_t.get("status") == "판매완료":
                                     orig_t["net_profit"] = round((h_sp * 0.98 - h_bp) * h_q, 1)
                                 hist_changed = True
-
                         if hist_changed:
                             save_json_local(GERSANG_FILE, gs_data)
                             st.session_state.gs_dirty = True
@@ -1147,8 +1256,659 @@ with tab_gersang:
 
 
 # ==============================================================================
-# 탭 3: 메이플스토리 화면 (다음 단계 예정)
+# 탭 3: 🍁 메이플스토리 화면 (3명의 관리 + 시급 판독기 + 미라클/경매장 판독기 + 장사 족보)
 # ==============================================================================
 with tab_maple:
     render_game_timer("maple", "메이플스토리", default_min=30)
-    st.info("🍁 거상 테스트 완료 후, 마지막으로 메이플스토리 맞춤형 대시보드가 들어갑니다.")
+
+    # 상단 수수료 설정 & 깃허브 백업 바
+    with st.container(border=True):
+        mp_top1, mp_top2, mp_top3 = st.columns([2.2, 2.0, 1.5])
+        with mp_top1:
+            st.markdown("**🍁 루나 서버 3명의 통합 관리** (주간보스: 목요일 00시 리셋 / 일일사냥·피로도: 매일 00시 리셋)")
+        with mp_top2:
+            fee_choice = st.radio(
+                "경매장 수수료율 설정",
+                ["MVP 실버 이상 (3%)", "일반 유저 (5%)"],
+                index=0 if float(mp_data.get("fee_rate", 0.03)) == 0.03 else 1,
+                horizontal=True,
+                label_visibility="collapsed"
+            )
+            new_fee = 0.03 if "3%" in fee_choice else 0.05
+            if new_fee != float(mp_data.get("fee_rate", 0.03)):
+                mp_data["fee_rate"] = new_fee
+                save_json_local(MAPLE_FILE, mp_data)
+                st.session_state.mp_dirty = True
+                st.rerun()
+        with mp_top3:
+            mp_btn_label = "💾 메이플 깃허브 백업 (미저장*)" if st.session_state.mp_dirty else "💾 메이플 깃허브 백업 (완료)"
+            mp_btn_type = "primary" if st.session_state.mp_dirty else "secondary"
+            if st.button(mp_btn_label, type=mp_btn_type, use_container_width=True, key="save_mp_gh"):
+                if save_json_github(MAPLE_FILE, mp_data, "Update Maple data"):
+                    st.session_state.mp_dirty = False
+                    st.toast("✅ 메이플스토리 데이터가 깃허브에 영구 저장되었습니다!")
+                    st.rerun()
+
+    # --------------------------------------------------------------------------
+    # 👤 [파트 1] 3개 명의(본계정 1 + 부계정 2) 주간 결정석 & 일일 체크
+    # --------------------------------------------------------------------------
+    acc_df = pd.DataFrame(mp_data["accounts"])
+    edited_acc = st.data_editor(
+        acc_df[["id", "명의명", "결정석완료", "결정석수익", "일일메소완료", "전문기술피로도", "메모"]],
+        column_config={
+            "id": None,
+            "명의명": st.column_config.TextColumn("✏️ 명의(계정) 구분", width="medium"),
+            "결정석완료": st.column_config.CheckboxColumn("💎 주간 결정석(1캐릭) 완료", width="small"),
+            "결정석수익": st.column_config.NumberColumn("✏️ 주간 보스 수익(만 메소)", width="small", min_value=0.0, step=500.0, format="%d만"),
+            "일일메소완료": st.column_config.CheckboxColumn("🪙 오늘 사냥 메소제한 완료", width="small"),
+            "전문기술피로도": st.column_config.CheckboxColumn("🧪 오늘 제작/채집 피로도 소모", width="small"),
+            "메모": st.column_config.TextColumn("✏️ 메모", width="medium")
+        },
+        use_container_width=True,
+        hide_index=True,
+        key=f"mp_acc_editor_{st.session_state.mp_editor_ver}"
+    )
+
+    acc_changed = False
+    for idx, r in edited_acc.iterrows():
+        orig_a = mp_data["accounts"][idx]
+        if (str(r["명의명"]) != orig_a["명의명"] or bool(r["결정석완료"]) != orig_a["결정석완료"] or
+            float(r["결정석수익"]) != float(orig_a["결정석수익"]) or bool(r["일일메소완료"]) != orig_a["일일메소완료"] or
+            bool(r["전문기술피로도"]) != orig_a["전문기술피로도"] or str(r["메모"]) != orig_a["메모"]):
+            orig_a["명의명"] = str(r["명의명"])
+            orig_a["결정석완료"] = bool(r["결정석완료"])
+            orig_a["결정석수익"] = float(r["결정석수익"])
+            orig_a["일일메소완료"] = bool(r["일일메소완료"])
+            orig_a["전문기술피로도"] = bool(r["전문기술피로도"])
+            orig_a["메모"] = str(r["메모"])
+            acc_changed = True
+    if acc_changed:
+        save_json_local(MAPLE_FILE, mp_data)
+        st.session_state.mp_dirty = True
+        st.rerun()
+
+    tot_boss_done = sum(float(a["결정석수익"]) for a in mp_data["accounts"] if a["결정석완료"])
+    tot_boss_all = sum(float(a["결정석수익"]) for a in mp_data["accounts"])
+    st.caption(f"💎 **이번 주 3명의 결정석 정산 현황:** 완료 **{fmt_man(tot_boss_done, '메소')}** / 전체 예상 **{fmt_man(tot_boss_all, '메소')}** | 모든 금액 단위는 **`만 메소`**입니다.")
+
+    # 서브 탭으로 메이플 3대 핵심 도구를 깔끔하게 분리
+    mp_sub1, mp_sub2, mp_sub3 = st.tabs([
+        "🏆 1. 오늘 뭐 할까? (당일 시세 기반 사냥 vs 장사 시급 판독기)",
+        "🎲 2. 경매장 매물 판독기 & 미라클 데이 잠재능력 기댓값 계산기",
+        "📖 3. 메이플 장사 가계부 & 시세 족보 (월별 달력)"
+    ])
+
+    fee_mult = 1.0 - float(mp_data.get("fee_rate", 0.03))
+    fee_pct_str = "3%" if float(mp_data.get("fee_rate", 0.03)) == 0.03 else "5%"
+
+    # --------------------------------------------------------------------------
+    # 🏆 [서브탭 1] 당일 시세 기반 '사냥 vs 제작/장사' 최고 효율 판독기
+    # --------------------------------------------------------------------------
+    with mp_sub1:
+        col_m1, col_m2 = st.columns([1.0, 1.4], gap="large")
+
+        with col_m1:
+            with st.container(border=True):
+                st.subheader("⚔️ 오늘의 재획(사냥) 시급 계산")
+                hc = mp_data["hunting_cfg"]
+
+                h1, h2 = st.columns(2)
+                with h1:
+                    frag_p = st.number_input("💎 오늘자 '솔 에르다 조각' 시세 (만 메소)", min_value=0.0, value=float(hc["frag_price"]), step=10.0, format="%.0f")
+                    pure_m = st.number_input("🪙 1시간 순메소 획득량 (만 메소)", min_value=0.0, value=float(hc["pure_meso_hr"]), step=100.0, format="%.0f")
+                with h2:
+                    frag_cnt = st.number_input("📦 1시간 평균 조각 획득량 (개)", min_value=0.0, value=float(hc["frags_per_hr"]), step=1.0, format="%.1f")
+                    extra_d = st.number_input("🎁 시간당 기타 드랍 수익 (만 메소)", min_value=0.0, value=float(hc["extra_drops_hr"]), step=50.0, format="%.0f")
+                cons_c = st.number_input("🧪 1시간 도핑 원가 (재획비/경축비/익골 등, 만 메소)", min_value=0.0, value=float(hc["consumable_hr"]), step=50.0, format="%.0f")
+
+                if (frag_p != hc["frag_price"] or pure_m != hc["pure_meso_hr"] or
+                    frag_cnt != hc["frags_per_hr"] or extra_d != hc["extra_drops_hr"] or cons_c != hc["consumable_hr"]):
+                    hc["frag_price"] = frag_p
+                    hc["pure_meso_hr"] = pure_m
+                    hc["frags_per_hr"] = frag_cnt
+                    hc["extra_drops_hr"] = extra_d
+                    hc["consumable_hr"] = cons_c
+                    save_json_local(MAPLE_FILE, mp_data)
+                    st.session_state.mp_dirty = True
+
+                # 사냥 시급 계산 (조각 및 기타 드랍은 경매장 수수료 차감)
+                frag_net_hr = (frag_p * frag_cnt) * fee_mult
+                extra_net_hr = extra_d * fee_mult
+                hunt_hourly_net = pure_m + frag_net_hr + extra_net_hr - cons_c
+
+                st.divider()
+                st.metric(
+                    "🔥 오늘 내 사냥(재획) 순수 시급",
+                    fmt_man(hunt_hourly_net, "메소"),
+                    f"1소재(30분) 기준: {fmt_man(hunt_hourly_net/2, '메소')}"
+                )
+                st.caption(f"내역: 순메소 {fmt_man(pure_m, '메소')} + 조각 실수령({fee_pct_str} 공제) {fmt_man(frag_net_hr, '메소')} - 도핑비 {fmt_man(cons_c, '메소')}")
+
+        with col_m2:
+            with st.container(border=True):
+                st.subheader("🧪 당일 시세 장사/제작 종목별 시급 비교표")
+                st.caption(f"오늘 경매장 재료값(원가)과 완제품 판매가를 수정하면 **수수료({fee_pct_str})를 뺀 건당 마진과 환산 시급**이 자동 계산됩니다! (하단 `+`로 종목 추가 가능)")
+
+                biz_list = mp_data["biz_methods"]
+                biz_rows = []
+                for idx, b in enumerate(biz_list):
+                    cost = float(b.get("원가(만)", 0))
+                    sell = float(b.get("판매가(만)", 0))
+                    freq = float(b.get("시간당횟수", 1))
+                    unit_margin = round(sell * fee_mult - cost, 1)
+                    hr_profit = round(unit_margin * freq, 1)
+                    biz_rows.append({
+                        "활성": bool(b.get("활성", True)),
+                        "돈벌이명": str(b.get("돈벌이명", "새 돈벌이")),
+                        "원가(만)": cost,
+                        "판매가(만)": sell,
+                        "시간당횟수": freq,
+                        "건당순수익(만)": unit_margin,
+                        "환산시급(만)": hr_profit,
+                        "메모": str(b.get("메모", ""))
+                    })
+
+                biz_df = pd.DataFrame(biz_rows) if biz_rows else pd.DataFrame(columns=["활성", "돈벌이명", "원가(만)", "판매가(만)", "시간당횟수", "건당순수익(만)", "환산시급(만)", "메모"])
+                edited_biz = st.data_editor(
+                    biz_df,
+                    column_config={
+                        "활성": st.column_config.CheckboxColumn("✅비교", width="small", default=True),
+                        "돈벌이명": st.column_config.TextColumn("✏️ 장사/제작 종목명", width="medium", required=True),
+                        "원가(만)": st.column_config.NumberColumn("✏️ 총 재료원가(만)", width="small", min_value=0.0, step=100.0, format="%d만", default=1000.0),
+                        "판매가(만)": st.column_config.NumberColumn("✏️ 오늘 판매가(만)", width="small", min_value=0.0, step=100.0, format="%d만", default=1500.0),
+                        "시간당횟수": st.column_config.NumberColumn("✏️ 시간당 제작/회전수", width="small", min_value=0.1, step=1.0, format="%.1f회", default=10.0),
+                        "건당순수익(만)": st.column_config.NumberColumn(f"1회 마진({fee_pct_str}제외)", width="small", format="%d만", disabled=True),
+                        "환산시급(만)": st.column_config.NumberColumn("🔥 환산 시급", width="small", format="%d만", disabled=True),
+                        "메모": st.column_config.TextColumn("✏️ 메모", width="small", default="")
+                    },
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    hide_index=True,
+                    key=f"mp_biz_editor_{st.session_state.mp_editor_ver}"
+                )
+
+                new_biz = []
+                for idx, r in edited_biz.iterrows():
+                    if pd.isna(r["돈벌이명"]) or str(r["돈벌이명"]).strip() == "":
+                        continue
+                    new_biz.append({
+                        "id": idx + 1,
+                        "활성": True if pd.isna(r["활성"]) else bool(r["활성"]),
+                        "돈벌이명": str(r["돈벌이명"]),
+                        "원가(만)": 0.0 if pd.isna(r["원가(만)"]) else float(r["원가(만)"]),
+                        "판매가(만)": 0.0 if pd.isna(r["판매가(만)"]) else float(r["판매가(만)"]),
+                        "시간당횟수": 1.0 if pd.isna(r["시간당횟수"]) else float(r["시간당횟수"]),
+                        "메모": "" if pd.isna(r["메모"]) else str(r["메모"])
+                    })
+                if new_biz != mp_data["biz_methods"]:
+                    mp_data["biz_methods"] = new_biz
+                    save_json_local(MAPLE_FILE, mp_data)
+                    st.session_state.mp_dirty = True
+                    st.rerun()
+
+        # 🏆 오늘의 종합 시급 1등 자동 판결 배너
+        candidates = [{"종목": "⚔️ 사냥 (재획 & 조각 파밍)", "시급": hunt_hourly_net, "비고": f"조각 개당 {int(frag_p)}만 메소 기준"}]
+        for b in mp_data["biz_methods"]:
+            if b.get("활성", True):
+                um = float(b["판매가(만)"]) * fee_mult - float(b["원가(만)"])
+                hp = um * float(b["시간당횟수"])
+                candidates.append({"종목": b["돈벌이명"], "시급": hp, "비고": f"1회 마진 {fmt_man(um, '메소')} (적자 주의!)" if um < 0 else f"1회 순마진 +{fmt_man(um, '메소')}"})
+
+        ranked = sorted(candidates, key=lambda x: x["시급"], reverse=True)
+        best = ranked[0]
+        if best["시급"] > hunt_hourly_net:
+            diff_m = best["시급"] - hunt_hourly_net
+            st.success(
+                f"🏆 **오늘의 AI 효율 판독 결과:** 지금 시세 기준으로는 사냥보다 **`[{best['종목']}]`**을(를) 돌리는 것이 시간당 **`+{fmt_man(diff_m, '메소')}`** 더 이득입니다! "
+                f"(환산 시급 1위: **{fmt_man(best['시급'], '메소')}** / 사냥 시급: **{fmt_man(hunt_hourly_net, '메소')}**)"
+            )
+        else:
+            st.info(
+                f"🏆 **오늘의 AI 효율 판독 결과:** 오늘 시세에서는 어중간한 제작/장사보다 **`[⚔️ 사냥(재획 & 조각 파밍)]`**을 도는 것이 시급 **`{fmt_man(hunt_hourly_net, '메소')}`**로 가장 효율적입니다!"
+            )
+
+    # --------------------------------------------------------------------------
+    # 🎲 [서브탭 2] 경매장 매물 판독기 & 미라클 데이 잠재능력 기댓값 계산기
+    # --------------------------------------------------------------------------
+    with mp_sub2:
+        st.markdown("#### 🎲 경매장 매물 스탯(옵션) 가격 판독기 & ✨ 미라클 데이 직작 계산기")
+        st.caption("경매장에서 본 아이템의 **스탯(옵션)과 현재 경매장 가격**을 입력하면, 직접 메소로 큐브를 돌려서 만드는 비용(기댓값)과 비교해 **'직작/장사 이득'인지 '직작하면 적자(경매장 매물 구매 추천)'인지** 즉시 판단해 줍니다!")
+
+        e_col1, e_col2 = st.columns([1.15, 1.25], gap="large")
+
+        with e_col1:
+            with st.container(border=True):
+                st.markdown("##### 📝 1. 판독할 아이템 & 목표 스탯(옵션) 입력")
+                eval_item_name = st.text_input("아이템 이름 (자유 기입)", value="트와일라잇 마크 / 데이브레이크 펜던트")
+
+                c_e1, c_e2 = st.columns(2)
+                with c_e1:
+                    cube_type = st.selectbox("잠재능력 구분", list(MAPLE_CUBE_COST_TABLE.keys()))
+                with c_e2:
+                    lv_bracket = st.selectbox("착용 레벨 구간", list(MAPLE_CUBE_COST_TABLE[cube_type].keys()), index=1)
+
+                c_e3, c_e4 = st.columns(2)
+                with c_e3:
+                    start_tier = st.selectbox("현재 시작 등급 (노작 등급)", TIER_ORDER, index=1) # 기본 에픽
+                with c_e4:
+                    target_tier = st.selectbox("목표 달성 등급", TIER_ORDER, index=3) # 기본 레전드리
+
+                opt_preset = st.selectbox("🎯 띄우려는 목표 스탯(옵션) 선택", list(MAPLE_OPTION_PRESETS.keys()), index=1)
+                if MAPLE_OPTION_PRESETS[opt_preset] is None:
+                    expected_opt_tries = st.number_input("직접 입력: 목표 옵션 평균 등장 시도 횟수 (회)", min_value=1.0, value=50.0, step=5.0)
+                else:
+                    expected_opt_tries = round(1.0 / MAPLE_OPTION_PRESETS[opt_preset], 1)
+
+                st.divider()
+                st.markdown("##### 💰 2. 현재 경매장 가격 입력 (단위: 만 메소)")
+                p_e1, p_e2 = st.columns(2)
+                with p_e1:
+                    base_item_price = st.number_input("🛒 노작(또는 현재 등급 베이스) 매입가 (만 메소)", min_value=0.0, value=5000.0, step=1000.0, format="%.0f")
+                    st.caption(f"환산: **{fmt_man(base_item_price, '메소')}**")
+                with p_e2:
+                    auction_finished_price = st.number_input("🏷️ 해당 스탯 완제품 현재 경매장 가격 (만 메소)", min_value=0.0, value=180000.0, step=5000.0, format="%.0f")
+                    st.caption(f"환산: **{fmt_man(auction_finished_price, '메소')}**")
+
+        with e_col2:
+            with st.container(border=True):
+                st.markdown("##### 📊 3. AI 기댓값 산출 & 직작/장사 손익 판정 결과")
+
+                # 1회 큐브 비용 및 옵션 기대 비용 계산
+                roll_unit_cost = MAPLE_CUBE_COST_TABLE[cube_type][lv_bracket][target_tier]
+                opt_expected_cost = expected_opt_tries * roll_unit_cost
+                # 상위 10% 억까(90% 안전선) 비용: 기하분포 기준 약 2.3배
+                opt_unlucky_cost = opt_expected_cost * 2.30
+
+                # 평일 vs 미라클 데이 등업 비용 계산
+                tier_cost_normal, tier_tries_normal = calc_tierup_expected_cost(cube_type, lv_bracket, start_tier, target_tier, is_miracle=False)
+                tier_cost_miracle, tier_tries_miracle = calc_tierup_expected_cost(cube_type, lv_bracket, start_tier, target_tier, is_miracle=True)
+
+                # 총 직작 원가 (노작값 + 등업 기댓값 + 옵션 기댓값)
+                total_craft_normal = base_item_price + tier_cost_normal + opt_expected_cost
+                total_craft_miracle = base_item_price + tier_cost_miracle + opt_expected_cost
+
+                # 경매장에 팔았을 때 실수령액 (수수료 3% or 5% 차감)
+                net_sell_revenue = auction_finished_price * fee_mult
+
+                # 장사(만들어서 팔기) 기대 순마진
+                flip_profit_normal = net_sell_revenue - total_craft_normal
+                flip_profit_miracle = net_sell_revenue - total_craft_miracle
+
+                # 내가 직접 입을 템일 때 (경매장 완제품 구매가 vs 직작 원가 차이)
+                self_use_diff_normal = auction_finished_price - total_craft_normal
+                self_use_diff_miracle = auction_finished_price - total_craft_miracle
+
+                r_c1, r_c2 = st.columns(2)
+                r_c1.metric(
+                    "📅 평일 직작 총 기대 원가",
+                    fmt_man(total_craft_normal, "메소"),
+                    f"등업 {fmt_man(tier_cost_normal, '메소')} + 옵션 {fmt_man(opt_expected_cost, '메소')}"
+                )
+                r_c2.metric(
+                    "✨ 미라클 데이 직작 총 기대 원가",
+                    fmt_man(total_craft_miracle, "메소"),
+                    f"평일 대비 등업비 -{fmt_man(tier_cost_normal - tier_cost_miracle, '메소')} 절약!"
+                )
+
+                st.caption(
+                    f"🔍 **상세 스펙:** [{target_tier}] 1회 재설정 비용 **{fmt_man(roll_unit_cost, '메소')}** × 평균 **{expected_opt_tries:.1f}회** 시도 = 옵션 기댓값 **{fmt_man(opt_expected_cost, '메소')}** "
+                    f"(⚠️ 운 나쁜 하위 10% 억까 시 옵션에만 최대 **{fmt_man(opt_unlucky_cost, '메소')}** 소요 가능)"
+                )
+
+                st.divider()
+
+                # 핵심 판정 1: 제작 후 재판매(장사) 관점
+                st.markdown(f"###### ⚖️ 판정 1: 노작 사서 만든 뒤 경매장에 `{fmt_man(auction_finished_price, '메소')}`에 팔 때 (장사꾼 관점)")
+                if flip_profit_miracle > 0 and flip_profit_normal > 0:
+                    st.success(
+                        f"🟢 **[장사 강력 추천 - 만들만함!]** 평일에 만들어 팔아도 평균 **`+{fmt_man(flip_profit_normal, '메소')}`** 이득이며, "
+                        f"**✨미라클 데이**에 제작해 팔면 평균 **`+{fmt_man(flip_profit_miracle, '메소')}`**의 순수익(수수료 {fee_pct_str} 제외)이 남는 꿀매물입니다!"
+                    )
+                elif flip_profit_miracle > 0 and flip_profit_normal <= 0:
+                    st.warning(
+                        f"🟡 **[미라클 데이 전용 장사템!]** 평일에 만들면 평균 **`{fmt_man(flip_profit_normal, '메소')}` 적자**지만, "
+                        f"**✨미라클 데이(등업 2배)**에 만들어서 팔면 평균 **`+{fmt_man(flip_profit_miracle, '메소')}` 흑자**로 전환됩니다! 미라클 데이에만 진입하세요."
+                    )
+                else:
+                    st.error(
+                        f"🔴 **[제작 장사 절대 금지 - 적자 확정!]** 미라클 데이에 만들어도 평균 **`{fmt_man(flip_profit_miracle, '메소')}` 손해**입니다! "
+                        f"(현재 경매장 완제품 가격 `{fmt_man(auction_finished_price, '메소')}`이 제작 기댓값보다 훨씬 싸게 형성되어 있습니다.)"
+                    )
+
+                # 핵심 판정 2: 내가 직접 쓰거나 사재기할 때 관점
+                st.markdown("###### 🛒 판정 2: 이 스탯의 아이템을 내가 구할 때 (직작 vs 경매장 구매)")
+                if self_use_diff_miracle < 0:
+                    st.info(
+                        f"💡 **경매장 급매물 알림:** 이 매물은 미라클 데이 직작 원가(`{fmt_man(total_craft_miracle, '메소')}`)보다도 경매장 가격(`{fmt_man(auction_finished_price, '메소')}`)이 "
+                        f"**`{fmt_man(abs(self_use_diff_miracle), '메소')}` 더 저렴합니다!** 절대 직접 큐브 돌리지 마시고 **경매장에 올라온 걸 그냥 사시는 게 무조건 이득**입니다."
+                    )
+                else:
+                    st.info(
+                        f"💡 **직작 우위:** 경매장 거품이 심합니다. 미라클 데이에 직접 만들면 경매장 구매가보다 평균 **`{fmt_man(self_use_diff_miracle, '메소')}`** 아낄 수 있습니다."
+                    )
+
+                if st.button("📌 이 판독 결과를 아래 비교표에 저장해 두기", use_container_width=True):
+                    mp_data["saved_evals"].append({
+                        "아이템명": eval_item_name,
+                        "부위/레벨": f"{cube_type[:2]} / {lv_bracket[:6]}",
+                        "목표옵션": opt_preset,
+                        "노작가": fmt_man(base_item_price, "메소"),
+                        "경매장완제가": fmt_man(auction_finished_price, "메소"),
+                        "평일기대원가": fmt_man(total_craft_normal, "메소"),
+                        "미라클기대원가": fmt_man(total_craft_miracle, "메소"),
+                        "미라클장사마진": f"+{fmt_man(flip_profit_miracle, '메소')}" if flip_profit_miracle >= 0 else fmt_man(flip_profit_miracle, "메소"),
+                        "판정": "🟢장사추천" if flip_profit_miracle > 0 else "🔴적자(완제구매)"
+                    })
+                    save_json_local(MAPLE_FILE, mp_data)
+                    st.session_state.mp_dirty = True
+                    st.rerun()
+
+        if mp_data.get("saved_evals"):
+            with st.expander("📋 내가 저장해 둔 경매장 매물 vs 미라클 직작 비교 리스트", expanded=True):
+                st.dataframe(pd.DataFrame(mp_data["saved_evals"]), use_container_width=True, hide_index=True)
+                if st.button("🗑️ 저장된 비교 리스트 비우기"):
+                    mp_data["saved_evals"] = []
+                    save_json_local(MAPLE_FILE, mp_data)
+                    st.session_state.mp_dirty = True
+                    st.rerun()
+
+    # --------------------------------------------------------------------------
+    # 📖 [서브탭 3] 메이플 장사 가계부 & 시세 족보 (월별 달력 & 재판매 손익 판단)
+    # --------------------------------------------------------------------------
+    with mp_sub3:
+        mp_trades = mp_data["maple_trades"]
+        now_kst = datetime.now(KST)
+        cur_ym = now_kst.strftime("%Y-%m")
+
+        mp_holding = [t for t in mp_trades if t.get("status") == "보유중"]
+        mp_sold = [t for t in mp_trades if t.get("status") == "판매완료"]
+
+        mp_tied = sum(float(t.get("buy_price", 0)) * int(t.get("qty", 1)) for t in mp_holding)
+        mp_month_profit = sum(float(t.get("net_profit", 0)) for t in mp_sold if str(t.get("sell_date", "")).startswith(cur_ym))
+        mp_total_profit = sum(float(t.get("net_profit", 0)) for t in mp_sold)
+
+        mk1, mk2, mk3 = st.columns(3)
+        mk1.metric(f"📅 이번 달({cur_ym}) 메이플 장사 순수익", fmt_man(mp_month_profit, "메소"), f"경매장 수수료 {fee_pct_str} 공제 후")
+        mk2.metric("🔒 현재 옥션/인벤 묶인 재고 자금", fmt_man(mp_tied, "메소"), f"보유 매물 {len(mp_holding)}건")
+        mk3.metric("👑 누적 총 메이플 장사 순수익", fmt_man(mp_total_profit, "메소"), f"누적 판매 {len(mp_sold)}건")
+
+        if mp_sold:
+            mp_monthly_map = {}
+            for t in mp_sold:
+                ym = str(t.get("sell_date", "기타"))[:7]
+                if ym not in mp_monthly_map:
+                    mp_monthly_map[ym] = {"월(YYYY-MM)": ym, "판매 건수": 0, "총 매출(만)": 0.0, "총 매입원가(만)": 0.0, "순수익(만)": 0.0}
+                qty = int(t.get("qty", 1))
+                mp_monthly_map[ym]["판매 건수"] += 1
+                mp_monthly_map[ym]["총 매출(만)"] += float(t.get("sell_price", 0)) * qty
+                mp_monthly_map[ym]["총 매입원가(만)"] += float(t.get("buy_price", 0)) * qty
+                mp_monthly_map[ym]["순수익(만)"] += float(t.get("net_profit", 0))
+            
+            mp_m_rows = sorted(mp_monthly_map.values(), key=lambda x: x["월(YYYY-MM)"], reverse=True)
+            for mr in mp_m_rows:
+                mr["순수익 환산"] = fmt_man(mr["순수익(만)"], "메소")
+                mr["수익률"] = f"{(mr['순수익(만)'] / mr['총 매입원가(만)'] * 100):.1f}%" if mr["총 매입원가(만)"] > 0 else "0%"
+            
+            with st.expander("🗓️ 메이플 월별 장사 수익 달력 상세 보기", expanded=True):
+                st.dataframe(pd.DataFrame(mp_m_rows)[["월(YYYY-MM)", "판매 건수", "순수익 환산", "수익률", "총 매입원가(만)", "총 매출(만)"]], use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        st.markdown("##### 📥 1. 메이플 장사 물건 매입(또는 제작 원가) 등록하기")
+        mb_c1, mb_c2, mb_c3, mb_c4 = st.columns([2, 1.5, 1, 1.2])
+        with mb_c1:
+            mp_in_item = st.text_input("아이템 이름", placeholder="예: 트와일라잇 마크(레전2줄), 경축비", key="mp_in_item")
+        with mb_c2:
+            mp_in_price = st.number_input("개당 산 가격/제작원가 (만 메소)", min_value=0.0, value=10000.0, step=500.0, format="%.0f", key="mp_in_price")
+        with mb_c3:
+            mp_in_qty = st.number_input("수량 (개)", min_value=1, value=1, step=1, key="mp_in_qty")
+        with mb_c4:
+            st.write("")
+            if st.button("➕ 메이플 장부에 추가", type="primary", use_container_width=True):
+                if mp_in_item.strip():
+                    new_id = max([t.get("id", 0) for t in mp_trades], default=0) + 1
+                    mp_trades.append({
+                        "id": new_id, "item_name": mp_in_item.strip(), "buy_price": float(mp_in_price),
+                        "qty": int(mp_in_qty), "buy_date": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
+                        "status": "보유중", "sell_price": 0.0, "sell_date": "", "net_profit": 0.0
+                    })
+                    save_json_local(MAPLE_FILE, mp_data)
+                    st.session_state.mp_dirty = True
+                    st.session_state.mp_editor_ver += 1
+                    st.toast(f"✅ [{mp_in_item.strip()}] {fmt_man(mp_in_price, '메소')} × {mp_in_qty}개 등록 완료!")
+                    st.rerun()
+                else:
+                    st.warning("아이템 이름을 입력해 주세요!")
+
+        if mp_in_item.strip():
+            same_mp_hist = [t for t in mp_trades if t.get("item_name") == mp_in_item.strip()]
+            if same_mp_hist:
+                tot_q = sum(int(t.get("qty", 1)) for t in same_mp_hist)
+                avg_b = sum(float(t.get("buy_price", 0)) * int(t.get("qty", 1)) for t in same_mp_hist) / tot_q
+                max_b = max(float(t.get("buy_price", 0)) for t in same_mp_hist)
+                min_b = min(float(t.get("buy_price", 0)) for t in same_mp_hist)
+                st.caption(f"💡 **[{mp_in_item.strip()}] 내 과거 족보:** 평균 매입가 **{fmt_man(avg_b, '메소')}** | 최고 매입가 **{fmt_man(max_b, '메소')}** | 최저 매입가 **{fmt_man(min_b, '메소')}** (누적 {tot_q}개 거래)")
+
+        st.divider()
+
+        st.markdown(f"##### 📦 2. 현재 보유 매물장 & 재판매 이득/손실 실시간 판독 (수수료 {fee_pct_str} 자동 반영)")
+        if not mp_holding:
+            st.info("현재 보유 중인 메이플 장사 매물이 없습니다.")
+        else:
+            mp_item_stats = {}
+            for t in mp_trades:
+                nm = t["item_name"]
+                mp_item_stats.setdefault(nm, {"q": 0, "sum": 0.0, "max": 0.0})
+                q = int(t.get("qty", 1))
+                bp = float(t.get("buy_price", 0))
+                mp_item_stats[nm]["q"] += q
+                mp_item_stats[nm]["sum"] += bp * q
+                if bp > mp_item_stats[nm]["max"]: mp_item_stats[nm]["max"] = bp
+
+            mp_hold_rows = []
+            for t in mp_holding:
+                nm = t["item_name"]
+                bp = float(t["buy_price"])
+                q = int(t.get("qty", 1))
+                avg_p = mp_item_stats[nm]["sum"] / mp_item_stats[nm]["q"]
+                max_p = mp_item_stats[nm]["max"]
+                breakeven = math.ceil(bp / fee_mult)
+                cur_sp = bp if float(t.get("sell_price", 0)) == 0 else float(t["sell_price"])
+                est_net = round((cur_sp * fee_mult - bp) * q, 1)
+                judge_str = f"🟢+{fmt_man(est_net, '메소')} 이득" if est_net > 0 else (f"🔴{fmt_man(est_net, '메소')} 손실" if est_net < 0 else "⚪본전")
+
+                mp_hold_rows.append({
+                    "id": t["id"], "아이템명": nm, "산가격(만)": bp, "보유수량": q,
+                    "내평균가(만)": round(avg_p, 1), "내최고가(만)": max_p,
+                    "본전판매가": f"{breakeven:,}만", "판수량": q,
+                    "판매가입력(만)": cur_sp, "예상손익판정": judge_str,
+                    "판매완료": False, "삭제": False
+                })
+
+            edited_mp_hold = st.data_editor(
+                pd.DataFrame(mp_hold_rows),
+                column_config={
+                    "id": None,
+                    "아이템명": st.column_config.TextColumn("✏️아이템명", width="small"),
+                    "산가격(만)": st.column_config.NumberColumn("✏️산 가격(만)", width="small", min_value=0.0, step=500.0, format="%d만"),
+                    "보유수량": st.column_config.NumberColumn("✏️보유수량", width="small", min_value=1, step=1),
+                    "내평균가(만)": st.column_config.NumberColumn("내 평단가", width="small", format="%d만", disabled=True),
+                    "내최고가(만)": st.column_config.NumberColumn("최고매입가", width="small", format="%d만", disabled=True),
+                    "본전판매가": st.column_config.TextColumn(f"{fee_pct_str}수수료 본전가", width="small", disabled=True),
+                    "판수량": st.column_config.NumberColumn("✏️판 수량", width="small", min_value=1, step=1),
+                    "판매가입력(만)": st.column_config.NumberColumn("✏️개당 판매예정가(만)", width="small", min_value=0.0, step=500.0, format="%d만"),
+                    "예상손익판정": st.column_config.TextColumn("재판매 이득/손실 판정", width="medium", disabled=True),
+                    "판매완료": st.column_config.CheckboxColumn("💰판매완료", width="small"),
+                    "삭제": st.column_config.CheckboxColumn("🗑️삭제", width="small")
+                },
+                use_container_width=True, hide_index=True,
+                key=f"mp_hold_editor_{st.session_state.mp_editor_ver}"
+            )
+
+            mp_trade_map = {t["id"]: t for t in mp_trades}
+            mp_hold_changed = False
+            for _, erow in edited_mp_hold.iterrows():
+                tid = int(erow["id"])
+                orig_t = mp_trade_map.get(tid)
+                if not orig_t: continue
+                if bool(erow["삭제"]):
+                    mp_trades.remove(orig_t)
+                    mp_hold_changed = True
+                    continue
+
+                new_nm = str(erow["아이템명"]).strip() if not pd.isna(erow["아이템명"]) else orig_t["item_name"]
+                new_bp = float(erow["산가격(만)"]) if not pd.isna(erow["산가격(만)"]) else float(orig_t["buy_price"])
+                new_bq = max(1, int(erow["보유수량"])) if not pd.isna(erow["보유수량"]) else int(orig_t.get("qty", 1))
+                new_sp = float(erow["판매가입력(만)"]) if not pd.isna(erow["판매가입력(만)"]) else float(orig_t.get("sell_price", 0.0))
+
+                if (new_nm != orig_t["item_name"] or new_bp != float(orig_t["buy_price"]) or
+                    new_bq != int(orig_t.get("qty", 1)) or new_sp != float(orig_t.get("sell_price", 0.0))):
+                    orig_t["item_name"] = new_nm
+                    orig_t["buy_price"] = new_bp
+                    orig_t["qty"] = new_bq
+                    orig_t["sell_price"] = new_sp
+                    mp_hold_changed = True
+
+                if bool(erow["판매완료"]):
+                    sp = float(erow["판매가입력(만)"])
+                    bp = float(orig_t["buy_price"])
+                    cur_q = int(orig_t.get("qty", 1))
+                    sell_q = max(1, min(cur_q, int(erow["판수량"])))
+                    net = round((sp * fee_mult - bp) * sell_q, 1)
+                    now_str_sell = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
+
+                    if sell_q < cur_q:
+                        orig_t["qty"] = cur_q - sell_q
+                        new_id = max([t.get("id", 0) for t in mp_trades], default=0) + 1
+                        mp_trades.append({
+                            "id": new_id, "item_name": orig_t["item_name"], "buy_price": bp, "qty": sell_q,
+                            "buy_date": orig_t.get("buy_date", ""), "status": "판매완료", "sell_price": sp,
+                            "sell_date": now_str_sell, "net_profit": net
+                        })
+                    else:
+                        orig_t["sell_price"] = sp
+                        orig_t["sell_date"] = now_str_sell
+                        orig_t["net_profit"] = net
+                        orig_t["status"] = "판매완료"
+                    mp_hold_changed = True
+
+            if mp_hold_changed:
+                save_json_local(MAPLE_FILE, mp_data)
+                st.session_state.mp_dirty = True
+                st.session_state.mp_editor_ver += 1
+                st.rerun()
+
+        st.divider()
+
+        with st.expander("📖 3. 메이플 매입 족보 & 과거 거래 영수증 (수정/복구 가능)", expanded=False):
+            if not mp_trades:
+                st.caption("아직 등록된 메이플 장사 내역이 없습니다.")
+            else:
+                mp_jokbo_map = {}
+                for t in mp_trades:
+                    nm = t["item_name"]
+                    mp_jokbo_map.setdefault(nm, {
+                        "아이템명": nm, "총 매입수량": 0, "매입합계": 0.0,
+                        "최고 매입가": 0.0, "최저 매입가": float('inf'),
+                        "판매수량": 0, "판매합계": 0.0, "누적 순수익": 0.0, "최근 거래일": ""
+                    })
+                    jb = mp_jokbo_map[nm]
+                    q = int(t.get("qty", 1))
+                    bp = float(t.get("buy_price", 0))
+                    jb["총 매입수량"] += q
+                    jb["매입합계"] += bp * q
+                    if bp > jb["최고 매입가"]: jb["최고 매입가"] = bp
+                    if bp < jb["최저 매입가"]: jb["최저 매입가"] = bp
+                    if str(t.get("buy_date", "")) > jb["최근 거래일"]:
+                        jb["최근 거래일"] = str(t.get("buy_date", ""))[:10]
+                    if t.get("status") == "판매완료":
+                        jb["판매수량"] += q
+                        jb["판매합계"] += float(t.get("sell_price", 0)) * q
+                        jb["누적 순수익"] += float(t.get("net_profit", 0))
+
+                mp_jokbo_rows = []
+                for nm, jb in sorted(mp_jokbo_map.items()):
+                    avg_buy = jb["매입합계"] / jb["총 매입수량"]
+                    be_price = math.ceil(avg_buy / fee_mult)
+                    avg_sell_str = f"{int(jb['판매합계']/jb['판매수량']):,}만" if jb["판매수량"] > 0 else "판매전"
+                    mp_jokbo_rows.append({
+                        "아이템명": nm, "누적매입": f"{jb['총 매입수량']}개",
+                        "내 평균매입가": f"{int(avg_buy):,}만 ({fmt_man(avg_buy, '메소')})",
+                        "최고비싸게산값": f"{int(jb['최고 매입가']):,}만",
+                        "최저매입가": f"{int(jb['최저 매입가']):,}만",
+                        f"{fee_pct_str}본전판매가": f"{be_price:,}만",
+                        "평균판매가": avg_sell_str,
+                        "누적순수익": fmt_man(jb["누적 순수익"], "메소"),
+                        "최근매입일": jb["최근 거래일"]
+                    })
+
+                mp_search_kw = st.text_input("🔍 메이플 족보/과거기록 아이템 검색", key="mp_jokbo_search")
+                mp_jokbo_df = pd.DataFrame(mp_jokbo_rows)
+                if mp_search_kw.strip():
+                    mp_jokbo_df = mp_jokbo_df[mp_jokbo_df["아이템명"].str.contains(mp_search_kw.strip(), case=False, na=False)]
+                st.dataframe(mp_jokbo_df, use_container_width=True, hide_index=True)
+
+                mp_hist_rows = []
+                for t in sorted(mp_trades, key=lambda x: x.get("id", 0), reverse=True):
+                    if mp_search_kw.strip() and mp_search_kw.strip().lower() not in t["item_name"].lower():
+                        continue
+                    mp_hist_rows.append({
+                        "id": t["id"], "상태": "🟢판매완료" if t.get("status") == "판매완료" else "📦보유중",
+                        "아이템명": t["item_name"], "수량": int(t.get("qty", 1)),
+                        "산가격(만)": float(t["buy_price"]), "판가격(만)": float(t.get("sell_price", 0.0)),
+                        "순수익": fmt_man(t.get("net_profit", 0), "메소") if t.get("status") == "판매완료" else "-",
+                        "매입일시": t.get("buy_date", ""), "보유중복구": False, "삭제": False
+                    })
+                if mp_hist_rows:
+                    edited_mp_hist = st.data_editor(
+                        pd.DataFrame(mp_hist_rows),
+                        column_config={
+                            "id": None,
+                            "상태": st.column_config.TextColumn("상태", width="small", disabled=True),
+                            "아이템명": st.column_config.TextColumn("✏️아이템명", width="small"),
+                            "수량": st.column_config.NumberColumn("✏️수량", width="small", min_value=1, step=1),
+                            "산가격(만)": st.column_config.NumberColumn("✏️산 가격(만)", width="small", min_value=0.0, step=500.0, format="%d만"),
+                            "판가격(만)": st.column_config.NumberColumn("✏️판 가격(만)", width="small", min_value=0.0, step=500.0, format="%d만"),
+                            "순수익": st.column_config.TextColumn(f"순수익({fee_pct_str}제외)", width="small", disabled=True),
+                            "매입일시": st.column_config.TextColumn("매입일시", width="small", disabled=True),
+                            "보유중복구": st.column_config.CheckboxColumn("↩️보유중복구", width="small"),
+                            "삭제": st.column_config.CheckboxColumn("🗑️삭제", width="small")
+                        },
+                        use_container_width=True, hide_index=True,
+                        key=f"mp_hist_editor_{st.session_state.mp_editor_ver}"
+                    )
+                    mp_trade_map = {t["id"]: t for t in mp_trades}
+                    mp_hist_changed = False
+                    for _, hrow in edited_mp_hist.iterrows():
+                        tid = int(hrow["id"])
+                        orig_t = mp_trade_map.get(tid)
+                        if not orig_t: continue
+                        if bool(hrow["삭제"]):
+                            mp_trades.remove(orig_t)
+                            mp_hist_changed = True
+                            continue
+                        if bool(hrow["보유중복구"]) and orig_t.get("status") == "판매완료":
+                            orig_t["status"] = "보유중"
+                            orig_t["sell_price"] = 0.0
+                            orig_t["sell_date"] = ""
+                            orig_t["net_profit"] = 0.0
+                            mp_hist_changed = True
+                            continue
+                        h_nm = str(hrow["아이템명"]).strip()
+                        h_q = max(1, int(hrow["수량"]))
+                        h_bp = float(hrow["산가격(만)"])
+                        h_sp = float(hrow["판가격(만)"])
+                        if (h_nm != orig_t["item_name"] or h_q != int(orig_t.get("qty", 1)) or
+                            h_bp != float(orig_t["buy_price"]) or h_sp != float(orig_t.get("sell_price", 0.0))):
+                            orig_t["item_name"] = h_nm
+                            orig_t["qty"] = h_q
+                            orig_t["buy_price"] = h_bp
+                            orig_t["sell_price"] = h_sp
+                            if orig_t.get("status") == "판매완료":
+                                orig_t["net_profit"] = round((h_sp * fee_mult - h_bp) * h_q, 1)
+                            mp_hist_changed = True
+                    if mp_hist_changed:
+                        save_json_local(MAPLE_FILE, mp_data)
+                        st.session_state.mp_dirty = True
+                        st.session_state.mp_editor_ver += 1
+                        st.rerun()

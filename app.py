@@ -23,7 +23,7 @@ DEFAULT_SERVERS = [
     ("8번계정", "x 아브 7"), ("8번계정", "실리안"), ("8번계정", "루페온 5"), ("8번계정", "카마인")
 ]
 
-RAID_OPTIONS = ["➖", "1/3", "2/3", "✅3/3", "🔧계승중"]
+RAID_OPTIONS = ["➖", "1/3", "2/3", "✅3/3", "🔧계승중", "✅계승완료"]
 TRUST_OPTIONS = ["🟡작업중", "🟢안전", "🔴부족"]
 
 # ⏱️ 끊기지 않는 게임별 타이머 & 알람 위젯
@@ -102,7 +102,7 @@ def render_game_timer(game_key, game_name, default_min=60):
             else:
                 st.info("👆 오늘 이 게임에 투자할 시간을 정하고 **[▶️ 타이머 시작]**을 누르세요.")
 
-# 오전 6시 기준 로아 '게임 날짜' 계산 함수 (카던 휴게 자동 회복용)
+# 오전 6시 기준 로아 '게임 날짜' 계산 함수
 def get_loa_day(dt):
     if dt.tzinfo is None:
         dt = KST.localize(dt)
@@ -115,14 +115,12 @@ def get_last_weekly_reset(now, reset_weekday=3):
         candidate -= timedelta(days=7)
     return candidate
 
-# 카던 휴게 표시 문자열 생성
 def format_cd_display(pts, run_str, now):
     if pts < 0:
         return "➖(제외)"
     bars = pts // 20
     half = ".5" if (pts % 20 >= 10) else ""
     
-    # 오늘(오전 6시 이후) 돌았는지 확인
     ran_today = False
     short_date = ""
     if run_str:
@@ -166,7 +164,8 @@ def create_initial_data(now_str):
             "보석메모": "",
         }
         for c in range(1, 7):
-            row[f"CD{c}_pts"] = 100 # 초기값: 한참 쉬었으므로 전원 5칸(100점) 세팅
+            row[f"LV{c}"] = "" # 캐릭터별 템렙/계승 메모 칸
+            row[f"CD{c}_pts"] = 100
             row[f"CD{c}_upd"] = now_str
             row[f"CD{c}_run"] = ""
             row[f"CD{c}"] = format_cd_display(100, "", now)
@@ -198,7 +197,8 @@ def ensure_schema(data):
         row.setdefault("카던큐브", "")
         row.setdefault("보석메모", "")
         for c in range(1, 7):
-            row.setdefault(f"CD{c}_pts", 100) # 기본 5칸(100점)
+            row.setdefault(f"LV{c}", "") # 템렙 칸 자동 보정
+            row.setdefault(f"CD{c}_pts", 100)
             row.setdefault(f"CD{c}_upd", now_str)
             row.setdefault(f"CD{c}_run", "")
             row.setdefault(f"CD{c}", format_cd_display(row[f"CD{c}_pts"], row[f"CD{c}_run"], now))
@@ -250,7 +250,7 @@ def process_auto_updates(data):
     if last_check.tzinfo is None:
         last_check = KST.localize(last_check)
 
-    # 1. 주간 초기화 (생활, 카던 휴식게이지, 신뢰도, 메모는 주간 초기화에서 제외!)
+    # 1. 주간 초기화 (생활, 템렙(LV), 카던 휴게(CD), 신뢰도, 메모는 절대 초기화 안 됨!)
     if last_check < last_reset:
         for row in data["rows"]:
             row["보석배"] = False
@@ -259,7 +259,9 @@ def process_auto_updates(data):
             row["이벤"] = False
             row["싱글"] = False
             for c in range(1, 7):
-                row[f"C{c}"] = "➖"
+                # 계승완료 표시가 아닌 일반 레이드 체크(1/3, 2/3, 3/3)만 주간 초기화
+                if row.get(f"C{c}") in ["1/3", "2/3", "✅3/3"]:
+                    row[f"C{c}"] = "➖"
         data["last_reset_check"] = now.isoformat()
         changed = True
 
@@ -326,6 +328,7 @@ tab_loa, tab_maple, tab_gersang = st.tabs(["⚓ 로스트아크 (25서버)", "�
 with tab_loa:
     render_game_timer("loa", "로스트아크", default_min=45)
 
+    # 필터 및 정렬 컨트롤 바
     col_f1, col_f2, col_f3, col_f4 = st.columns([1.8, 1.5, 1.8, 1])
     with col_f1:
         only_todo = st.checkbox("🔥 할 일 남음(생기 풀 / 보석배 미수령)만 보기", value=False)
@@ -348,26 +351,47 @@ with tab_loa:
             st.session_state.loa_data_v3 = process_auto_updates(data)
             st.rerun()
 
-    st.caption("💡 **카던 휴게 사용법:** 캐릭터별 `🌀1카~6카` 칸을 더블클릭해서 **`⚡오늘돌았음(-1칸)`**을 선택하면 자동으로 1칸이 까이고 오늘 날짜가 기록됩니다! (안 돌면 이틀마다 1칸씩 자동 회복)")
+    # 👁️ 화면 가로폭 조절을 위한 표시 항목 선택 바
+    col_v1, col_v2, col_v3, col_v4 = st.columns([1.2, 1.2, 1.2, 2.4])
+    with col_v1:
+        show_lv = st.checkbox("📊 캐릭터별 템렙 보이기", value=True)
+    with col_v2:
+        show_cd = st.checkbox("🌀 카던 휴게 보이기", value=True)
+    with col_v3:
+        show_raid = st.checkbox("⚔️ 레이드/계승 보이기", value=True)
+    with col_v4:
+        group_by_char = st.checkbox("👥 캐릭터별로 묶어서 배열 (1렙-1카-1캐 순서)", value=True)
 
+    # 선택한 옵션에 따라 표에 보여줄 컬럼 순서 구성
     display_cols = [
         "id", "계정명", "서버", "신뢰도", "생활완료", "생기상태",
-        "보석배", "보석배시간", "낙원", "이벤", "싱글",
-        "CD1", "CD2", "CD3", "CD4", "CD5", "CD6",
-        "카던큐브", "보석메모", "C1", "C2", "C3", "C4", "C5", "C6"
+        "보석배", "보석배시간", "낙원", "이벤", "싱글"
     ]
+    
+    if group_by_char:
+        # 1번 캐릭의 (템렙 -> 카던 -> 레이드)를 나란히 붙여서 한눈에 파악!
+        for c in range(1, 7):
+            if show_lv: display_cols.append(f"LV{c}")
+            if show_cd: display_cols.append(f"CD{c}")
+            if show_raid: display_cols.append(f"C{c}")
+    else:
+        # 종류별로 모아서 보기
+        if show_lv: display_cols.extend([f"LV{c}" for c in range(1, 7)])
+        if show_cd: display_cols.extend([f"CD{c}" for c in range(1, 7)])
+        if show_raid: display_cols.extend([f"C{c}" for c in range(1, 7)])
+
+    display_cols.extend(["카던큐브", "보석메모"])
 
     df = pd.DataFrame(data["rows"])
     for col in display_cols:
         if col not in df.columns:
-            df[col] = False if col in ["생활완료", "보석배", "낙원", "이벤", "싱글"] else "➖"
+            df[col] = False if col in ["생활완료", "보석배", "낙원", "이벤", "싱글"] else ""
 
     if only_todo:
         df = df[(~df["생활완료"]) | (~df["보석배"])]
     if sort_urgent:
         df = df.sort_values(by=["생활완료", "생기수치", "보석배"], ascending=[True, False, True])
 
-    # 카던 드롭다운 옵션 구성 (현재 표시값 + 조작 메뉴)
     base_cd_actions = [
         "⚡오늘돌았음(-1칸)",
         "🔥5칸(풀)",
@@ -380,7 +404,8 @@ with tab_loa:
     ]
     all_cd_vals = set(base_cd_actions)
     for c in range(1, 7):
-        all_cd_vals.update(df[f"CD{c}"].dropna().unique().tolist())
+        if f"CD{c}" in df.columns:
+            all_cd_vals.update(df[f"CD{c}"].dropna().unique().tolist())
     cd_options = base_cd_actions + [x for x in sorted(all_cd_vals) if x not in base_cd_actions]
 
     column_config = {
@@ -400,6 +425,9 @@ with tab_loa:
     }
     
     for c in range(1, 7):
+        column_config[f"LV{c}"] = st.column_config.TextColumn(
+            f"📊{c}렙", width="small", help=f"{c}번 캐릭터 템렙 및 계승 현황 입력 (예: 1660, 1640계승중)"
+        )
         column_config[f"CD{c}"] = st.column_config.SelectboxColumn(
             f"🌀{c}카", options=cd_options, width="small", help="카던 돌았을 때 '⚡오늘돌았음(-1칸)' 선택!"
         )
@@ -413,7 +441,7 @@ with tab_loa:
         use_container_width=True,
         hide_index=True,
         height=880,
-        key="loa_editor_v3"
+        key="loa_editor_v4"
     )
 
     now = datetime.now(KST)
@@ -424,40 +452,45 @@ with tab_loa:
         rid = int(edit_row["id"])
         orig = orig_map[rid]
 
-        for col in ["계정명", "서버", "신뢰도", "카던큐브", "보석메모", "C1", "C2", "C3", "C4", "C5", "C6"]:
-            val = "" if pd.isna(edit_row[col]) else str(edit_row[col])
-            if orig.get(col, "") != val:
-                orig[col] = val
-                changed = True
+        # 텍스트 및 선택형 컬럼 업데이트 (표에 표시 중인 컬럼만 안전하게 반영)
+        text_cols = ["계정명", "서버", "신뢰도", "카던큐브", "보석메모"]
+        text_cols += [f"LV{c}" for c in range(1, 7)]
+        text_cols += [f"C{c}" for c in range(1, 7)]
+        
+        for col in text_cols:
+            if col in edit_row:
+                val = "" if pd.isna(edit_row[col]) else str(edit_row[col])
+                if orig.get(col, "") != val:
+                    orig[col] = val
+                    changed = True
 
         # 카던 휴식게이지 조작 감지
         for c in range(1, 7):
             col_cd = f"CD{c}"
-            new_val = "" if pd.isna(edit_row[col_cd]) else str(edit_row[col_cd])
-            old_val = orig.get(col_cd, "")
-            
-            if new_val != old_val:
-                if new_val == "⚡오늘돌았음(-1칸)":
-                    cur_pts = orig.get(f"CD{c}_pts", 100)
-                    if cur_pts < 0:
-                        cur_pts = 100
-                    # 오늘 돌았으므로 1칸(20점) 차감 + 오늘치 자연회복 없도록 기준일을 내일로 세팅
-                    orig[f"CD{c}_pts"] = max(0, cur_pts - 20)
-                    orig[f"CD{c}_run"] = now.isoformat()
-                    orig[f"CD{c}_upd"] = (now + timedelta(days=1)).isoformat()
-                elif new_val == "➖(제외)":
-                    orig[f"CD{c}_pts"] = -1
-                    orig[f"CD{c}_run"] = ""
-                    orig[f"CD{c}_upd"] = now.isoformat()
-                else:
-                    # 수동으로 0칸~5칸 직접 지정한 경우
-                    for b in range(6):
-                        if f"{b}칸" in new_val:
-                            orig[f"CD{c}_pts"] = b * 20
-                            orig[f"CD{c}_upd"] = now.isoformat()
-                            break
-                orig[col_cd] = format_cd_display(orig[f"CD{c}_pts"], orig[f"CD{c}_run"], now)
-                changed = True
+            if col_cd in edit_row:
+                new_val = "" if pd.isna(edit_row[col_cd]) else str(edit_row[col_cd])
+                old_val = orig.get(col_cd, "")
+                
+                if new_val != old_val:
+                    if new_val == "⚡오늘돌았음(-1칸)":
+                        cur_pts = orig.get(f"CD{c}_pts", 100)
+                        if cur_pts < 0:
+                            cur_pts = 100
+                        orig[f"CD{c}_pts"] = max(0, cur_pts - 20)
+                        orig[f"CD{c}_run"] = now.isoformat()
+                        orig[f"CD{c}_upd"] = (now + timedelta(days=1)).isoformat()
+                    elif new_val == "➖(제외)":
+                        orig[f"CD{c}_pts"] = -1
+                        orig[f"CD{c}_run"] = ""
+                        orig[f"CD{c}_upd"] = now.isoformat()
+                    else:
+                        for b in range(6):
+                            if f"{b}칸" in new_val:
+                                orig[f"CD{c}_pts"] = b * 20
+                                orig[f"CD{c}_upd"] = now.isoformat()
+                                break
+                    orig[col_cd] = format_cd_display(orig[f"CD{c}_pts"], orig[f"CD{c}_run"], now)
+                    changed = True
 
         if orig["생활완료"] != bool(edit_row["생활완료"]):
             orig["생활완료"] = bool(edit_row["생활완료"])

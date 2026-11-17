@@ -1,6 +1,6 @@
 {
   "last_weekly_reset": "2026-11-16T18:38:33.596430+09:00",
-  "last_daily_date": "2026-11-16",
+  "last_daily_date": "2026-11-17",
   "fee_rate": 0.05,
   "accounts": [
     {
@@ -99,5 +99,6 @@
     "shift_pct": 0.0,
     "band_threshold": 5.0,
     "current_watch_rate": 2093.0
-  }
+  },
+  "jokbo_shift_pct": 0.0
 }

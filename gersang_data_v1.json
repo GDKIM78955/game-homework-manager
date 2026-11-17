@@ -1,5 +1,5 @@
 {
-  "last_daily_date": "2026-11-16",
+  "last_daily_date": "2026-11-17",
   "daily_tasks": {
     "quest": false,
     "factory": false,
@@ -32,5 +32,106 @@
     ],
     "profit_link_mode": "합산 안 함 (2클라 자체 자금만)"
   },
-  "client1_trades": []
+  "client1_trades": [
+    {
+      "id": 1,
+      "item_name": "결빙석",
+      "buy_price": 32.0,
+      "qty": 172,
+      "buy_date": "2026-11-17 18:25",
+      "status": "보유중",
+      "sell_price": 0.0,
+      "sell_date": "",
+      "net_profit": 0.0
+    },
+    {
+      "id": 2,
+      "item_name": "결빙석",
+      "buy_price": 30.0,
+      "qty": 7,
+      "buy_date": "2026-11-17 18:26",
+      "status": "보유중",
+      "sell_price": 0.0,
+      "sell_date": "",
+      "net_profit": 0.0
+    },
+    {
+      "id": 3,
+      "item_name": "결빙석",
+      "buy_price": 33.0,
+      "qty": 10,
+      "buy_date": "2026-11-17 18:26",
+      "status": "보유중",
+      "sell_price": 0.0,
+      "sell_date": "",
+      "net_profit": 0.0
+    },
+    {
+      "id": 4,
+      "item_name": "결빙석",
+      "buy_price": 33.0,
+      "qty": 7,
+      "buy_date": "2026-11-17 18:26",
+      "status": "보유중",
+      "sell_price": 0.0,
+      "sell_date": "",
+      "net_profit": 0.0
+    },
+    {
+      "id": 5,
+      "item_name": "결빙석",
+      "buy_price": 34.0,
+      "qty": 4,
+      "buy_date": "2026-11-17 18:26",
+      "status": "보유중",
+      "sell_price": 0.0,
+      "sell_date": "",
+      "net_profit": 0.0
+    },
+    {
+      "id": 6,
+      "item_name": "결빙석",
+      "buy_price": 34.5,
+      "qty": 5,
+      "buy_date": "2026-11-17 18:27",
+      "status": "보유중",
+      "sell_price": 0.0,
+      "sell_date": "",
+      "net_profit": 0.0
+    },
+    {
+      "id": 7,
+      "item_name": "결빙석",
+      "buy_price": 34.5,
+      "qty": 48,
+      "buy_date": "2026-11-17 18:27",
+      "status": "보유중",
+      "sell_price": 0.0,
+      "sell_date": "",
+      "net_profit": 0.0
+    },
+    {
+      "id": 8,
+      "item_name": "단풍석",
+      "buy_price": 27.0,
+      "qty": 200,
+      "buy_date": "2026-11-17 18:27",
+      "status": "보유중",
+      "sell_price": 0.0,
+      "sell_date": "",
+      "net_profit": 0.0
+    },
+    {
+      "id": 9,
+      "item_name": "뇌전의 기운이 서린뿔",
+      "buy_price": 585.0,
+      "qty": 1,
+      "buy_date": "2026-11-17 18:28",
+      "status": "보유중",
+      "sell_price": 0.0,
+      "sell_date": "",
+      "net_profit": 0.0
+    }
+  ],
+  "jokbo_shift_pct": 0.0
 }

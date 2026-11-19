@@ -445,25 +445,33 @@ def load_gersang_data():
 
 
 # ==============================================================================
-# 🍁 3. 메이플스토리 `mesu.live` 올인원 통합 엔진 (17성 파괴 기댓값 보정 반영)
+# 🍁 3. 메이플스토리 2026 넥슨 공식 확률·비용 통합 엔진 (잠재 4구간 + 2025개편 스타포스 수식)
 # ==============================================================================
+# [A] 넥슨 공식 잠재능력 1회 재설정 비용 정가표 (4구간 통일, 단위: 만 메소)
 MAPLE_CUBE_COST_TABLE = {
     "윗잠 (잠재능력)": {
-        "71~110제 (미카엘라 새안경/하프이어링 등)": {"레어": 320.0, "에픽": 1280.0, "유니크": 3060.0, "레전드리": 3600.0},
-        "120~150제 (이벤링/보장/루타비스)": {"레어": 360.0, "에픽": 1440.0, "유니크": 3400.0, "레전드리": 4000.0},
-        "160제 (여명/앱솔랩스)": {"레어": 425.0, "에픽": 1700.0, "유니크": 3825.0, "레전드리": 4500.0},
-        "200제 (아케인셰이드/칠흑)": {"레어": 450.0, "에픽": 1800.0, "유니크": 4250.0, "레전드리": 5000.0},
-        "250제 (에테르넬/광휘)": {"레어": 500.0, "에픽": 2000.0, "유니크": 4675.0, "레전드리": 5500.0},
+        "1~159제 (미카엘라/이벤링/보장/루타비스)": {"레어": 400.0, "에픽": 1600.0, "유니크": 3400.0, "레전드리": 4000.0},
+        "160~199제 (여명/앱솔랩스)": {"레어": 425.0, "에픽": 1700.0, "유니크": 3612.5, "레전드리": 4250.0},
+        "200~249제 (아케인셰이드/칠흑/제네시스)": {"레어": 450.0, "에픽": 1800.0, "유니크": 3825.0, "레전드리": 4500.0},
+        "250~300제 (에테르넬/광휘)": {"레어": 500.0, "에픽": 2000.0, "유니크": 4250.0, "레전드리": 5000.0},
     },
     "아랫잠 (에디셔널)": {
-        "71~110제 (미카엘라 새안경/하프이어링 등)": {"레어": 1000.0, "에픽": 2800.0, "유니크": 6800.0, "레전드리": 8000.0},
-        "120~150제 (이벤링/보장/루타비스)": {"레어": 1100.0, "에픽": 3080.0, "유니크": 7480.0, "레전드리": 8800.0},
-        "160제 (여명/앱솔랩스)": {"레어": 1150.0, "에픽": 3220.0, "유니크": 7820.0, "레전드리": 9200.0},
-        "200제 (아케인셰이드/칠흑)": {"레어": 1300.0, "에픽": 3640.0, "유니크": 8840.0, "레전드리": 10400.0},
-        "250제 (에테르넬/광휘)": {"레어": 1450.0, "에픽": 4060.0, "유니크": 9860.0, "레전드리": 11600.0},
+        "1~159제 (미카엘라/이벤링/보장/루타비스)": {"레어": 1950.0, "에픽": 3900.0, "유니크": 6630.0, "레전드리": 7800.0},
+        "160~199제 (여명/앱솔랩스)": {"레어": 2072.0, "에픽": 4144.0, "유니크": 7044.0, "레전드리": 8288.0},
+        "200~249제 (아케인셰이드/칠흑/제네시스)": {"레어": 2200.0, "에픽": 4400.0, "유니크": 7480.0, "레전드리": 8800.0},
+        "250~300제 (에테르넬/광휘)": {"레어": 2450.0, "에픽": 4900.0, "유니크": 8330.0, "레전드리": 9800.0},
     }
 }
 
+# 레벨 구간별 대표 스타포스 장비 레벨 기본값
+BRACKET_DEFAULT_LV = {
+    "1~159제 (미카엘라/이벤링/보장/루타비스)": 150,
+    "160~199제 (여명/앱솔랩스)": 160,
+    "200~249제 (아케인셰이드/칠흑/제네시스)": 200,
+    "250~300제 (에테르넬/광휘)": 250,
+}
+
+# [B] 넥슨 공식 메소 재설정 등급업 확률(p) + 천장 횟수(pity)
 MAPLE_TIERUP_SPEC = {
     "윗잠 (잠재능력)": {
         "레어->에픽": {"p": 0.150000, "pity": 10},
@@ -471,47 +479,52 @@ MAPLE_TIERUP_SPEC = {
         "유니크->레전드리": {"p": 0.014000, "pity": 107}
     },
     "아랫잠 (에디셔널)": {
-        "레어->에픽": {"p": 0.047619, "pity": 31},
-        "에픽->유니크": {"p": 0.019608, "pity": 76},
+        "레어->에픽": {"p": 0.023810, "pity": 62},
+        "에픽->유니크": {"p": 0.009804, "pity": 152},
         "유니크->레전드리": {"p": 0.007000, "pity": 214}
     }
 }
 
+MAPLE_EQUIP_PARTS = ["장신구 (반지/펜던트/귀고리/얼장/눈장)", "방어구 (상의/하의/신발/망토/어깨)", "장갑", "모자", "무보엠 (무기/보조/엠블렘)"]
+
+# [C] 부위 필터 지원 윗잠/아랫잠 공식 확률 프리셋
 MAPLE_MAIN_POT_OPTIONS = {
-    "[레전드리/장신구] 드랍 or 메획 1줄 이상 (20%+)": {"prob_pct": 15.8200, "tier": "레전드리"},
-    "[레전드리/장신구] 드랍+메획 총합 2줄 이상 (드메 2줄 핵심!)": {"prob_pct": 1.3960, "tier": "레전드리"},
-    "[레전드리/장신구] 드랍 or 메획 1줄 + 주스탯 2줄": {"prob_pct": 1.1200, "tier": "레전드리"},
-    "[레전드리/장신구] 드랍+메획 총합 3줄 (극옵 드메 3줄)": {"prob_pct": 0.0385, "tier": "레전드리"},
-    "[레전드리/방어구·장신구] 주스탯 21% 이상 (올스탯 포함)": {"prob_pct": 6.4500, "tier": "레전드리"},
-    "[레전드리/방어구·장신구] 주스탯 24% 이상 (정옵 2줄+)": {"prob_pct": 3.1800, "tier": "레전드리"},
-    "[레전드리/방어구·장신구] 주스탯 27% 이상 (준3줄 국민옵)": {"prob_pct": 1.5400, "tier": "레전드리"},
-    "[레전드리/방어구·장신구] 주스탯 30% 이상 (3줄 정옵)": {"prob_pct": 0.5780, "tier": "레전드리"},
-    "[레전드리/방어구·장신구] 주스탯 33% 이상 (극옵 3줄)": {"prob_pct": 0.2190, "tier": "레전드리"},
-    "[레전드리/장갑] 크리티컬 데미지 1줄(8%) + 주스탯 1줄+": {"prob_pct": 5.6200, "tier": "레전드리"},
-    "[레전드리/장갑] 크리티컬 데미지 2줄 (16% 이상)": {"prob_pct": 0.7420, "tier": "레전드리"},
-    "[레전드리/모자] 쿨타임 감소 -2초 이상 (주스탯 무관)": {"prob_pct": 6.8500, "tier": "레전드리"},
-    "[레전드리/모자] 쿨타임 감소 -2초 + 주스탯 1줄+": {"prob_pct": 2.9500, "tier": "레전드리"},
-    "[레전드리/모자] 쿨타임 감소 -3초 이상": {"prob_pct": 1.4800, "tier": "레전드리"},
-    "[레전드리/모자] 쿨타임 감소 -4초 이상": {"prob_pct": 0.3520, "tier": "레전드리"},
-    "[레전드리/무보엠] 보공/방무/공마 유효 2줄": {"prob_pct": 8.3300, "tier": "레전드리"},
-    "[레전드리/무보엠] 보공/공마 유효 3줄 (방무 제외)": {"prob_pct": 0.9120, "tier": "레전드리"},
-    "[레전드리/무보엠] 공격력/마력 21% 이상 (2줄+)": {"prob_pct": 3.5800, "tier": "레전드리"},
-    "[레전드리/무보엠] 공격력/마력 30% 이상 (3줄)": {"prob_pct": 0.2640, "tier": "레전드리"},
-    "[유니크/방어구·장신구] 주스탯 15% ~ 18% (유니크 2줄)": {"prob_pct": 6.6700, "tier": "유니크"},
-    "[에픽/방어구·장신구] 주스탯 9% ~ 12% (에픽 2줄 토드용)": {"prob_pct": 10.2000, "tier": "에픽"},
-    "🔗 mesu.live 세부 확률(%) 직접 입력": {"prob_pct": None, "tier": "레전드리"}
+    "[레전드리/장신구] 드랍 or 메획 1줄 이상 (20%+)": {"prob_pct": 15.8200, "tier": "레전드리", "parts": ["장신구"]},
+    "[레전드리/장신구] 드랍+메획 총합 2줄 이상 (드메 2줄 핵심!)": {"prob_pct": 1.3960, "tier": "레전드리", "parts": ["장신구"]},
+    "[레전드리/장신구] 드랍 or 메획 1줄 + 주스탯 2줄": {"prob_pct": 1.1200, "tier": "레전드리", "parts": ["장신구"]},
+    "[레전드리/장신구] 드랍+메획 총합 3줄 (극옵 드메 3줄)": {"prob_pct": 0.0385, "tier": "레전드리", "parts": ["장신구"]},
+    "[레전드리] 주스탯 21% 이상 (올스탯 포함)": {"prob_pct": 6.4500, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[레전드리] 주스탯 24% 이상 (정옵 2줄+)": {"prob_pct": 3.1800, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[레전드리] 주스탯 27% 이상 (준3줄 국민옵)": {"prob_pct": 1.5400, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[레전드리] 주스탯 30% 이상 (3줄 정옵)": {"prob_pct": 0.5780, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[레전드리] 주스탯 33% 이상 (극옵 3줄)": {"prob_pct": 0.2190, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[레전드리/장갑] 크리티컬 데미지 1줄(8%) + 주스탯 1줄+": {"prob_pct": 5.6200, "tier": "레전드리", "parts": ["장갑"]},
+    "[레전드리/장갑] 크리티컬 데미지 2줄 (16% 이상)": {"prob_pct": 0.7420, "tier": "레전드리", "parts": ["장갑"]},
+    "[레전드리/모자] 쿨타임 감소 -2초 이상 (주스탯 무관)": {"prob_pct": 6.8500, "tier": "레전드리", "parts": ["모자"]},
+    "[레전드리/모자] 쿨타임 감소 -2초 + 주스탯 1줄+": {"prob_pct": 2.9500, "tier": "레전드리", "parts": ["모자"]},
+    "[레전드리/모자] 쿨타임 감소 -3초 이상": {"prob_pct": 1.4800, "tier": "레전드리", "parts": ["모자"]},
+    "[레전드리/모자] 쿨타임 감소 -4초 이상": {"prob_pct": 0.3520, "tier": "레전드리", "parts": ["모자"]},
+    "[레전드리/무보엠] 보공/방무/공마 유효 2줄": {"prob_pct": 8.3300, "tier": "레전드리", "parts": ["무보엠"]},
+    "[레전드리/무보엠] 보공/공마 유효 3줄 (방무 제외)": {"prob_pct": 0.9120, "tier": "레전드리", "parts": ["무보엠"]},
+    "[레전드리/무보엠] 공격력/마력 21% 이상 (2줄+)": {"prob_pct": 3.5800, "tier": "레전드리", "parts": ["무보엠"]},
+    "[레전드리/무보엠] 공격력/마력 30% 이상 (3줄)": {"prob_pct": 0.2640, "tier": "레전드리", "parts": ["무보엠"]},
+    "[유니크] 주스탯 15% ~ 18% (유니크 2줄)": {"prob_pct": 6.6700, "tier": "유니크", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[에픽] 주스탯 9% ~ 12% (에픽 2줄 토드용)": {"prob_pct": 10.2000, "tier": "에픽", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[에픽/무보엠] 공격력/마력 9% ~ 12% (에픽 2줄)": {"prob_pct": 6.8000, "tier": "에픽", "parts": ["무보엠"]},
+    "🔗 mesu.live 세부 확률(%) 직접 입력": {"prob_pct": None, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자", "무보엠"]}
 }
 
 MAPLE_ADI_POT_OPTIONS = {
-    "[아랫잠/레어] 공/마 +10 (에디 레어 1줄 가성비)": {"prob_pct": 6.2500, "tier": "레어"},
-    "[아랫잠/에픽] 공/마 +10 또는 주스탯 4%+ (에디 에픽 1.5~2줄)": {"prob_pct": 5.5500, "tier": "에픽"},
-    "[아랫잠/에픽] 공/마 +21 또는 주스탯 8%+ (에디 에픽 2줄 정옵)": {"prob_pct": 0.9200, "tier": "에픽"},
-    "[아랫잠/유니크] 에디 주스탯 2줄 or 공/마 2줄 (유니크 국민옵)": {"prob_pct": 2.2200, "tier": "유니크"},
-    "[아랫잠/레전드리] 에디 주스탯 2줄+ (정옵 2줄)": {"prob_pct": 2.1500, "tier": "레전드리"},
-    "[아랫잠/레전드리] 에디 주스탯 2.5~3줄 (준종결/종결)": {"prob_pct": 0.7690, "tier": "레전드리"},
-    "[아랫잠/무보엠] 에디 공격력/마력 12%~15% (유니크/레전 1줄+)": {"prob_pct": 6.8000, "tier": "레전드리"},
-    "[아랫잠/무보엠] 에디 공격력/마력 21% 이상 (2줄)": {"prob_pct": 1.8180, "tier": "레전드리"},
-    "🔗 mesu.live 아랫잠 세부 확률(%) 직접 입력": {"prob_pct": None, "tier": "레전드리"}
+    "[아랫잠/레어] 공/마 +10 (에디 레어 1줄 가성비)": {"prob_pct": 6.2500, "tier": "레어", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[아랫잠/에픽] 공/마 +10 또는 주스탯 4%+ (에디 에픽 1.5~2줄)": {"prob_pct": 5.5500, "tier": "에픽", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[아랫잠/에픽] 공/마 +21 또는 주스탯 8%+ (에디 에픽 2줄 정옵)": {"prob_pct": 0.9200, "tier": "에픽", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[아랫잠/유니크] 에디 주스탯 2줄 or 공/마 2줄 (유니크 국민옵)": {"prob_pct": 2.2200, "tier": "유니크", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[아랫잠/레전드리] 에디 주스탯 2줄+ (정옵 2줄)": {"prob_pct": 2.1500, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[아랫잠/레전드리] 에디 주스탯 2.5~3줄 (준종결/종결)": {"prob_pct": 0.7690, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자"]},
+    "[아랫잠/무보엠] 에디 공/마 6% ~ 9% (에픽 1.5~2줄)": {"prob_pct": 4.8000, "tier": "에픽", "parts": ["무보엠"]},
+    "[아랫잠/무보엠] 에디 공격력/마력 12%~15% (유니크/레전 1줄+)": {"prob_pct": 6.8000, "tier": "레전드리", "parts": ["무보엠"]},
+    "[아랫잠/무보엠] 에디 공격력/마력 21% 이상 (2줄)": {"prob_pct": 1.8180, "tier": "레전드리", "parts": ["무보엠"]},
+    "🔗 mesu.live 아랫잠 세부 확률(%) 직접 입력": {"prob_pct": None, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자", "무보엠"]}
 }
 
 MAPLE_FLAME_PRESETS = {
@@ -536,66 +549,88 @@ MAPLE_FLAME_PRESETS = {
     }
 }
 
-MAPLE_STARFORCE_TABLE = {
-    "71~110제 (미카엘라 새안경/하프이어링 등)": {
-        "10성 (가성비)": {"cost": 400.0, "booms": 0.0},
-        "12성 (부캐/토드)": {"cost": 900.0, "booms": 0.0},
-        "15성": {"cost": 3500.0, "booms": 0.0},
-        "17성": {"cost": 7800.0, "booms": 0.06},
-        "18성": {"cost": 16000.0, "booms": 0.16},
-        "20성": {"cost": 55000.0, "booms": 0.85},
-        "21성": {"cost": 85000.0, "booms": 1.40},
-        "22성": {"cost": 165000.0, "booms": 2.90},
-    },
-    "120~150제 (이벤링/보장/루타비스)": {
-        "10성 (가성비)": {"cost": 900.0, "booms": 0.0},
-        "12성 (부캐/토드)": {"cost": 2200.0, "booms": 0.0},
-        "15성": {"cost": 11500.0, "booms": 0.0},
-        "17성 (국민 가성비)": {"cost": 27000.0, "booms": 0.08},
-        "18성 (본캐 가성비)": {"cost": 58000.0, "booms": 0.25},
-        "20성": {"cost": 195000.0, "booms": 1.15},
-        "21성 (준종결)": {"cost": 295000.0, "booms": 1.85},
-        "22성 (종결)": {"cost": 580000.0, "booms": 3.70},
-    },
-    "160제 (여명/앱솔랩스)": {
-        "10성 (가성비)": {"cost": 1300.0, "booms": 0.0},
-        "12성 (부캐/토드)": {"cost": 3100.0, "booms": 0.0},
-        "15성": {"cost": 16500.0, "booms": 0.0},
-        "17성 (국민 가성비)": {"cost": 38500.0, "booms": 0.08},
-        "18성 (본캐 가성비)": {"cost": 82000.0, "booms": 0.25},
-        "20성": {"cost": 275000.0, "booms": 1.15},
-        "21성 (준종결)": {"cost": 415000.0, "booms": 1.85},
-        "22성 (종결)": {"cost": 820000.0, "booms": 3.70},
-    },
-    "200제 (아케인셰이드/칠흑)": {
-        "10성 (가성비)": {"cost": 2500.0, "booms": 0.0},
-        "12성 (부캐/토드)": {"cost": 6000.0, "booms": 0.0},
-        "15성": {"cost": 32000.0, "booms": 0.0},
-        "17성 (국민 가성비)": {"cost": 75000.0, "booms": 0.08},
-        "18성 (본캐 가성비)": {"cost": 160000.0, "booms": 0.25},
-        "20성": {"cost": 540000.0, "booms": 1.15},
-        "21성 (준종결)": {"cost": 810000.0, "booms": 1.85},
-        "22성 (종결)": {"cost": 1600000.0, "booms": 3.70},
-    },
-    "250제 (에테르넬/광휘)": {
-        "10성 (가성비)": {"cost": 4800.0, "booms": 0.0},
-        "12성 (부캐/토드)": {"cost": 11500.0, "booms": 0.0},
-        "15성": {"cost": 62000.0, "booms": 0.0},
-        "17성 (국민 가성비)": {"cost": 145000.0, "booms": 0.08},
-        "18성 (본캐 가성비)": {"cost": 310000.0, "booms": 0.25},
-        "20성": {"cost": 1050000.0, "booms": 1.15},
-        "21성 (준종결)": {"cost": 1580000.0, "booms": 1.85},
-        "22성 (종결)": {"cost": 3100000.0, "booms": 3.70},
-    }
-}
-
+# [D] 2025.03 개편 이후 넥슨 공식 스타포스 이벤트 기준 (성수 하락 삭제 반영)
 STARFORCE_EVENTS = {
     "📅 노이벤트 (평일 기준)": {"cost_mult": 1.00, "boom_mult": 1.00},
-    "🌟 5·10·15성 100% 성공 이벤트": {"cost_mult": 0.76, "boom_mult": 0.72},
-    "💰 스타포스 비용 30% 할인 이벤트": {"cost_mult": 0.70, "boom_mult": 1.00},
-    "⚡ 10성 이하 1+1 이벤트": {"cost_mult": 0.90, "boom_mult": 1.00},
-    "✨ 샤이닝 스타포스 (5·10·15성 100% + 30% 할인)": {"cost_mult": 0.53, "boom_mult": 0.72},
+    "💰 스타포스 비용 30% 할인": {"cost_mult": 0.70, "boom_mult": 1.00},
+    "🛡️ 21성 이하 파괴 확률 30% 감소": {"cost_mult": 1.00, "boom_mult": 0.70},
+    "✨ 샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 30% 감소)": {"cost_mult": 0.70, "boom_mult": 0.70},
 }
+
+# 2025.03 개편 넥슨 공식 스타포스 확률 (s -> s+1: 성공확률, 파괴확률 / 하락 없음)
+SF_OFFICIAL_PROB = {
+    0: (0.95, 0.0), 1: (0.90, 0.0), 2: (0.85, 0.0), 3: (0.85, 0.0), 4: (0.80, 0.0),
+    5: (0.75, 0.0), 6: (0.70, 0.0), 7: (0.65, 0.0), 8: (0.60, 0.0), 9: (0.55, 0.0),
+    10: (0.50, 0.0), 11: (0.45, 0.0), 12: (0.40, 0.0), 13: (0.35, 0.0), 14: (0.30, 0.0),
+    15: (0.30, 0.021), 16: (0.30, 0.021),
+    17: (0.15, 0.068), 18: (0.15, 0.068), 19: (0.15, 0.085),
+    20: (0.30, 0.105), 21: (0.15, 0.1275),
+}
+
+def get_sf_click_base_man(item_lv, star):
+    L = float(item_lv)
+    s = int(star)
+    if s < 10:
+        raw = 1000.0 + (L ** 3) * (s + 1) / 25.0
+    else:
+        div_map = {
+            10: 400.0, 11: 220.0, 12: 150.0, 13: 110.0, 14: 75.0,
+            15: 200.0, 16: 200.0, 17: 150.0, 18: 70.0, 19: 45.0,
+            20: 200.0, 21: 125.0
+        }
+        div = div_map.get(s, 200.0)
+        raw = 1000.0 + (L ** 3) * ((s + 1) ** 2.7) / div
+    return round(raw, -2) / 10000.0
+
+def calc_starforce_expected(item_lv, start_star, target_star, spare_cost_man, event_key, use_safeguard=False, use_starcatch=True):
+    s_start = max(0, min(21, int(start_star)))
+    s_target = max(1, min(22, int(target_star)))
+    if s_start >= s_target:
+        return {"meso_cost": 0.0, "spare_cost": 0.0, "total_cost": 0.0, "booms": 0.0}
+
+    ev = STARFORCE_EVENTS.get(event_key, {"cost_mult": 1.0, "boom_mult": 1.0})
+    c_mult = ev["cost_mult"]
+    b_mult = ev["boom_mult"]
+
+    # s -> s+1 단계별 기대 메소비(F_meso) 및 기대 파괴수(F_boom) 마르코프 체인 정밀 계산 (파괴 시 12성 복구)
+    F_meso = [0.0] * 22
+    F_boom = [0.0] * 22
+
+    for s in range(s_target):
+        p_base, b_base = SF_OFFICIAL_PROB[s]
+        base_man = get_sf_click_base_man(item_lv, s)
+
+        # 파괴방지 (15~17성: 기본비용 +200% 추가, 파괴확률 0)
+        sg_active = use_safeguard and (15 <= s <= 17)
+        b_cur = 0.0 if sg_active else (b_base * (b_mult if s <= 21 else 1.0))
+        click_man = (base_man * c_mult) + (base_man * 2.0 if sg_active else 0.0)
+
+        # 스타캐치 (성공확률 1.05배, 실패/파괴 비율 비례 축소)
+        if use_starcatch and p_base < 1.0:
+            p_cur = min(1.0, p_base * 1.05)
+            rem_scale = (1.0 - p_cur) / max(1e-9, 1.0 - p_base)
+            b_cur = b_cur * rem_scale
+        else:
+            p_cur = p_base
+
+        if b_cur <= 0.0 or s < 15:
+            F_meso[s] = click_man / p_cur
+            F_boom[s] = 0.0
+        else:
+            climb_meso = sum(F_meso[12:s])
+            climb_boom = sum(F_boom[12:s])
+            F_meso[s] = (click_man + b_cur * climb_meso) / p_cur
+            F_boom[s] = (b_cur * (1.0 + climb_boom)) / p_cur
+
+    meso_tot = sum(F_meso[s_start:s_target])
+    booms_tot = sum(F_boom[s_start:s_target])
+    spare_tot = booms_tot * float(spare_cost_man)
+    return {
+        "meso_cost": round(meso_tot, 1),
+        "spare_cost": round(spare_tot, 1),
+        "total_cost": round(meso_tot + spare_tot, 1),
+        "booms": round(booms_tot, 3)
+    }
 
 TIER_ORDER = ["레어", "에픽", "유니크", "레전드리"]
 
@@ -908,7 +943,7 @@ with st.expander("💵 [통합 수익 사령탑] 3개 게임 실시간 현금 �
 tab_loa, tab_gersang, tab_maple = st.tabs([
     "⚓ 로스트아크 (25서버)",
     "💰 천하제일상 거상 (2클라+장사+시세보정)",
-    "🍁 메이플스토리 (3명의+올인원종합견적기+메소마켓)"
+    "🍁 메이플스토리 (3명의+2026공식견적기+메소마켓)"
 ])
 # [파트 1 끝]
 # [파트 2 시작]
@@ -1636,7 +1671,7 @@ with tab_gersang:
 # [파트 2 끝]
 # [파트 3 시작]
 # ==============================================================================
-# 탭 3: 🍁 메이플스토리 화면 (해방무기 프리셋 + 올인원 백과사전 완결판)
+# 탭 3: 🍁 메이플스토리 화면 (2026 넥슨 공식 엔진 + 단품/반제품 초고속 견적기)
 # ==============================================================================
 with tab_maple:
     render_game_timer("maple", "메이플스토리", default_min=30)
@@ -1708,7 +1743,7 @@ with tab_maple:
 
     mp_sub1, mp_sub2, mp_sub3, mp_sub4, mp_sub5 = st.tabs([
         "🏆 1. 사냥 vs 장사 시급 판독기 & 🧪 비약 원가",
-        "🛠️ 2. 올인원 종합 견적기 (해방무기/방어구/장신구)",
+        "🛠️ 2. 2026 공식 견적기 (단품/반제품/풀세팅)",
         "💱 3. 메소마켓 (시세 일지 & % 보정 & AI 추천)",
         "📖 4. 메이플 장사 가계부 & 시세 족보",
         "📘 5. 직작 & 장사 백과사전 (추옵/옵션/작 자동판독기)"
@@ -1861,141 +1896,206 @@ with tab_maple:
                     )
 
     # --------------------------------------------------------------------------
-    # 🛠️ [서브탭 2] 올인원(추옵+주흔작%+스타포스+윗잠+아랫잠+보정%) 종합 견적 & 매물 판독기
+    # 🛠️ [서브탭 2] 2026 넥슨 공식 단품·반제품·올인원 종합 견적 & 매물 판독기
     # --------------------------------------------------------------------------
     with mp_sub2:
-        st.markdown("#### 🛠️ 올인원(`노작+가위+추옵+주흔작+스타포스+윗잠+아랫잠+시세보정%`) 완제품 종합 견적 & 경매장 매물 판독기")
+        st.markdown("#### 🛠️ 2026 넥슨 공식 단품·반제품·풀세팅 견적기 (`잠재 4구간 · 에디 공식확률 · 2025개편 스타포스 수식`)")
         st.caption(
-            "**장비 레벨 구간과 목표 옵션만 선택하면 `mesu.live` 공식 확률·1회 비용·주흔 소모량이 100% 자동으로 세팅됩니다!** "
-            "(무기 추옵·옵션 우선순위·주문서 작 판별이 헷갈리시면 오른쪽 끝 **`📘 5. 직작 & 장사 백과사전`** 탭을 참고하세요!)"
+            "**위 `[⚡ 단품 초고속 조회]` 버튼을 누르면 필요한 파트 1개만 켜져서 반제품(예: 레전 윗잠만 붙은 매물) 시세를 3초 만에 감정할 수 있습니다!** "
+            "원하는 체크박스를 추가로 켜서 `윗잠 + 스타포스` 같은 조합 견적도 자유롭게 확인하세요."
         )
 
         AUTO_TRACE_SPEC = {
-            "71~110제 (미카엘라 새안경/하프이어링 등)": {"장신구 (5~6작)": (5, 200), "방어구 (8~9작)": (8, 250), "무기 (9~10작)": (9, 350)},
-            "120~150제 (이벤링/보장/루타비스)": {"장신구 (5~6작)": (6, 400), "방어구 (8~12작)": (8, 550), "무기 (9~10작)": (10, 900)},
-            "160제 (여명/앱솔랩스)": {"장신구 (6~7작)": (6, 550), "방어구 (8~12작)": (9, 750), "무기 (9~10작)": (10, 1200)},
-            "200제 (아케인셰이드/칠흑)": {"장신구 (6~7작)": (7, 800), "방어구 (8~12작)": (9, 1150), "무기 (9~10작)": (10, 1800)},
-            "250제 (에테르넬/광휘)": {"장신구 (6~7작)": (7, 1100), "방어구 (8~12작)": (9, 1500), "무기 (9~10작)": (10, 2400)},
+            "1~159제 (미카엘라/이벤링/보장/루타비스)": {"장신구 (5~6작)": (6, 400), "방어구 (8~12작)": (8, 550), "무기 (9~10작)": (10, 900)},
+            "160~199제 (여명/앱솔랩스)": {"장신구 (6~7작)": (6, 550), "방어구 (8~12작)": (9, 750), "무기 (9~10작)": (10, 1200)},
+            "200~249제 (아케인셰이드/칠흑/제네시스)": {"장신구 (6~7작)": (7, 800), "방어구 (8~12작)": (9, 1150), "무기 (9~10작)": (10, 1800)},
+            "250~300제 (에테르넬/광휘)": {"장신구 (6~7작)": (7, 1100), "방어구 (8~12작)": (9, 1500), "무기 (9~10작)": (10, 2400)},
         }
 
+        lv_list = list(MAPLE_CUBE_COST_TABLE["윗잠 (잠재능력)"].keys())
+
         preset_keys = {
-            "est_name": "데이브레이크 펜던트 / 미카엘라 새 안경 / 아케인 무기",
-            "est_lv": "160제 (여명/앱솔랩스)", "est_base": 5000.0, "est_auc": 450000.0, "est_val_shift": 0.0,
-            "est_use_scis": False, "est_use_flm": True, "est_fl_cat": "보스 장신구/방어구 (추옵 보정 O)",
-            "est_use_scr": True, "est_use_sf": True, "est_use_main": True, "est_use_adi": True,
-            "est_sf_goal": "18성 (본캐 가성비)",
-            "est_main_start": "에픽", "est_main_opt": "[레전드리/방어구·장신구] 주스탯 27% 이상 (준3줄 국민옵)",
-            "est_adi_start": "레어", "est_adi_opt": "[아랫잠/에픽] 공/마 +10 또는 주스탯 4%+ (에디 에픽 1.5~2줄)"
+            "est_name": "데이브레이크 펜던트 / 반제품·완제품 감정",
+            "est_lv": lv_list[1],
+            "est_exact_lv": 160,
+            "est_part": MAPLE_EQUIP_PARTS[0],
+            "est_base": 5000.0,
+            "est_include_base": True,
+            "est_auc": 250000.0,
+            "est_val_shift": 0.0,
+            "est_use_scis": False,
+            "est_use_flm": False,
+            "est_fl_cat": "보스 장신구/방어구 (추옵 보정 O)",
+            "est_use_scr": False,
+            "est_use_sf": False,
+            "est_sf_start": 0,
+            "est_sf_target": 18,
+            "est_sf_ev": "✨ 샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 30% 감소)",
+            "est_sf_sg": False,
+            "est_sf_sc": True,
+            "est_use_main": True,
+            "est_use_adi": False,
+            "est_main_start": "에픽",
+            "est_main_opt": "[레전드리] 주스탯 27% 이상 (준3줄 국민옵)",
+            "est_adi_start": "레어",
+            "est_adi_opt": "[아랫잠/에픽] 공/마 +10 또는 주스탯 4%+ (에디 에픽 1.5~2줄)"
         }
         for pk, pv in preset_keys.items():
             if pk not in st.session_state:
                 st.session_state[pk] = pv
 
+        # 구버전 세션값 자동 보정
+        if st.session_state.est_lv not in lv_list:
+            st.session_state.est_lv = lv_list[1]
+            st.session_state.est_exact_lv = BRACKET_DEFAULT_LV[lv_list[1]]
+        if st.session_state.est_part not in MAPLE_EQUIP_PARTS:
+            st.session_state.est_part = MAPLE_EQUIP_PARTS[0]
+        if st.session_state.est_sf_ev not in STARFORCE_EVENTS:
+            st.session_state.est_sf_ev = list(STARFORCE_EVENTS.keys())[3]
+
+        # [상단 바 1] 단품/반제품 초고속 모드 전환 버튼
         with st.container(border=True):
-            st.markdown("##### ⚡ 원클릭 국민 세팅 프리셋 (장신구 · 방어구 · 제네시스 해방 무기 · 해방 전 아케인 무기)")
-            pr1, pr2, pr3, pr4, pr5, pr6 = st.columns(6)
-            with pr1:
-                if st.button("👓 90제 미카엘라 드메2줄", use_container_width=True):
-                    st.session_state.est_name = "미카엘라의 새 안경 (90제 드메2줄)"
-                    st.session_state.est_lv = "71~110제 (미카엘라 새안경/하프이어링 등)"
-                    st.session_state.est_base = 1500.0; st.session_state.est_auc = 320000.0; st.session_state.est_val_shift = 0.0
+            st.markdown("##### ⚡ 단품·반제품 초고속 조회 (원하는 파트 1개만 즉시 켜기 — 이후 체크박스로 자유 조합 가능)")
+            qm1, qm2, qm3, qm4, qm5, qm6 = st.columns(6)
+            with qm1:
+                if st.button("🎲 윗잠만 단독 조회", use_container_width=True, type="primary" if (st.session_state.est_use_main and not any([st.session_state.est_use_flm, st.session_state.est_use_scr, st.session_state.est_use_sf, st.session_state.est_use_adi])) else "secondary"):
                     st.session_state.est_use_flm = False; st.session_state.est_use_scr = False; st.session_state.est_use_sf = False
-                    st.session_state.est_use_main = True; st.session_state.est_use_adi = False
-                    st.session_state.est_main_start = "에픽"
-                    st.session_state.est_main_opt = "[레전드리/장신구] 드랍+메획 총합 2줄 이상 (드메 2줄 핵심!)"
+                    st.session_state.est_use_main = True; st.session_state.est_use_adi = False; st.session_state.est_include_base = True
                     st.rerun()
-            with pr2:
-                if st.button("💍 17성 유니크 가성비", use_container_width=True):
-                    st.session_state.est_name = "17성 유니크 가성비 방어구/장신구"
-                    st.session_state.est_lv = "160제 (여명/앱솔랩스)"
-                    st.session_state.est_base = 3000.0; st.session_state.est_auc = 95000.0; st.session_state.est_val_shift = 0.0
-                    st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 장신구/방어구 (추옵 보정 O)"
-                    st.session_state.est_use_scr = True; st.session_state.est_use_sf = True
-                    st.session_state.est_use_main = True; st.session_state.est_use_adi = True
-                    st.session_state.est_sf_goal = "17성 (국민 가성비)"
-                    st.session_state.est_main_start = "에픽"
-                    st.session_state.est_main_opt = "[유니크/방어구·장신구] 주스탯 15% ~ 18% (유니크 2줄)"
-                    st.session_state.est_adi_start = "레어"
-                    st.session_state.est_adi_opt = "[아랫잠/에픽] 공/마 +10 또는 주스탯 4%+ (에디 에픽 1.5~2줄)"
+            with qm2:
+                if st.button("✨ 아랫잠만 단독 조회", use_container_width=True, type="primary" if (st.session_state.est_use_adi and not any([st.session_state.est_use_flm, st.session_state.est_use_scr, st.session_state.est_use_sf, st.session_state.est_use_main])) else "secondary"):
+                    st.session_state.est_use_flm = False; st.session_state.est_use_scr = False; st.session_state.est_use_sf = False
+                    st.session_state.est_use_main = False; st.session_state.est_use_adi = True; st.session_state.est_include_base = True
                     st.rerun()
-            with pr3:
-                if st.button("🔥 18성 레전27% 국민템", use_container_width=True):
-                    st.session_state.est_name = "18성 레전 27% 국민 본캐 템"
-                    st.session_state.est_lv = "160제 (여명/앱솔랩스)"
-                    st.session_state.est_base = 5000.0; st.session_state.est_auc = 480000.0; st.session_state.est_val_shift = 0.0
-                    st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 장신구/방어구 (추옵 보정 O)"
-                    st.session_state.est_use_scr = True; st.session_state.est_use_sf = True
-                    st.session_state.est_use_main = True; st.session_state.est_use_adi = True
-                    st.session_state.est_sf_goal = "18성 (본캐 가성비)"
-                    st.session_state.est_main_start = "에픽"
-                    st.session_state.est_main_opt = "[레전드리/방어구·장신구] 주스탯 27% 이상 (준3줄 국민옵)"
-                    st.session_state.est_adi_start = "레어"
-                    st.session_state.est_adi_opt = "[아랫잠/유니크] 에디 주스탯 2줄 or 공/마 2줄 (유니크 국민옵)"
+            with qm3:
+                if st.button("⭐ 스타포스만 단독 조회", use_container_width=True, type="primary" if (st.session_state.est_use_sf and not any([st.session_state.est_use_flm, st.session_state.est_use_scr, st.session_state.est_use_main, st.session_state.est_use_adi])) else "secondary"):
+                    st.session_state.est_use_flm = False; st.session_state.est_use_scr = False; st.session_state.est_use_sf = True
+                    st.session_state.est_use_main = False; st.session_state.est_use_adi = False; st.session_state.est_include_base = False
                     st.rerun()
-            with pr4:
-                if st.button("👑 22성 레전30% 종결템", use_container_width=True):
-                    st.session_state.est_name = "22성 아케인/칠흑 종결 세팅"
-                    st.session_state.est_lv = "200제 (아케인셰이드/칠흑)"
-                    st.session_state.est_base = 35000.0; st.session_state.est_auc = 2800000.0; st.session_state.est_val_shift = 0.0
-                    st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 장신구/방어구 (추옵 보정 O)"
-                    st.session_state.est_use_scr = True; st.session_state.est_use_sf = True
-                    st.session_state.est_use_main = True; st.session_state.est_use_adi = True
-                    st.session_state.est_sf_goal = "22성 (종결)"
-                    st.session_state.est_main_start = "에픽"
-                    st.session_state.est_main_opt = "[레전드리/방어구·장신구] 주스탯 30% 이상 (3줄 정옵)"
-                    st.session_state.est_adi_start = "레어"
-                    st.session_state.est_adi_opt = "[아랫잠/레전드리] 에디 주스탯 2.5~3줄 (준종결/종결)"
+            with qm4:
+                if st.button("🔥 추옵만 단독 조회", use_container_width=True, type="primary" if (st.session_state.est_use_flm and not any([st.session_state.est_use_scr, st.session_state.est_use_sf, st.session_state.est_use_main, st.session_state.est_use_adi])) else "secondary"):
+                    st.session_state.est_use_flm = True; st.session_state.est_use_scr = False; st.session_state.est_use_sf = False
+                    st.session_state.est_use_main = False; st.session_state.est_use_adi = False; st.session_state.est_include_base = False
                     st.rerun()
-            with pr5:
-                if st.button("⚔️ 제네시스 해방무기 직작", use_container_width=True):
-                    st.session_state.est_name = "제네시스 해방 무기 (22성·15%완작 기본 지급)"
-                    st.session_state.est_lv = "200제 (아케인셰이드/칠흑)"
-                    st.session_state.est_base = 0.0; st.session_state.est_auc = 0.0; st.session_state.est_val_shift = 0.0
-                    st.session_state.est_use_scis = False
-                    st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 무기 (아케인/해방무기 등)"
-                    st.session_state.est_use_scr = False; st.session_state.est_use_sf = False
-                    st.session_state.est_use_main = True; st.session_state.est_use_adi = True
-                    st.session_state.est_main_start = "유니크"
-                    st.session_state.est_main_opt = "[레전드리/무보엠] 보공/공마 유효 3줄 (방무 제외)"
-                    st.session_state.est_adi_start = "에픽"
-                    st.session_state.est_adi_opt = "[아랫잠/무보엠] 에디 공격력/마력 21% 이상 (2줄)"
+            with qm5:
+                if st.button("📜 작만 단독 조회", use_container_width=True, type="primary" if (st.session_state.est_use_scr and not any([st.session_state.est_use_flm, st.session_state.est_use_sf, st.session_state.est_use_main, st.session_state.est_use_adi])) else "secondary"):
+                    st.session_state.est_use_flm = False; st.session_state.est_use_scr = True; st.session_state.est_use_sf = False
+                    st.session_state.est_use_main = False; st.session_state.est_use_adi = False; st.session_state.est_include_base = False
                     st.rerun()
-            with pr6:
-                if st.button("🗡️ 해방전 18성 아케인무기", use_container_width=True):
-                    st.session_state.est_name = "해방 전 거쳐가는 18성 아케인셰이드 무기 (중고 감가 -35% 반영)"
-                    st.session_state.est_lv = "200제 (아케인셰이드/칠흑)"
-                    st.session_state.est_base = 10000.0; st.session_state.est_auc = 350000.0; st.session_state.est_val_shift = -35.0
-                    st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 무기 (아케인/해방무기 등)"
-                    st.session_state.est_use_scr = True; st.session_state.est_use_sf = True
-                    st.session_state.est_use_main = True; st.session_state.est_use_adi = True
-                    st.session_state.est_sf_goal = "18성 (본캐 가성비)"
-                    st.session_state.est_main_start = "에픽"
-                    st.session_state.est_main_opt = "[레전드리/무보엠] 보공/방무/공마 유효 2줄"
-                    st.session_state.est_adi_start = "레어"
-                    st.session_state.est_adi_opt = "[아랫잠/무보엠] 에디 공격력/마력 12%~15% (유니크/레전 1줄+)"
+            with qm6:
+                if st.button("🛠️ 5개 전체 풀세팅", use_container_width=True, type="primary" if all([st.session_state.est_use_flm, st.session_state.est_use_scr, st.session_state.est_use_sf, st.session_state.est_use_main, st.session_state.est_use_adi]) else "secondary"):
+                    st.session_state.est_use_flm = True; st.session_state.est_use_scr = True; st.session_state.est_use_sf = True
+                    st.session_state.est_use_main = True; st.session_state.est_use_adi = True; st.session_state.est_include_base = True
                     st.rerun()
+
+            with st.expander("🎯 국민 완제품 원클릭 프리셋 펼치기 (미카엘라 드메 / 18성·22성 / 제네시스 해방무기)", expanded=False):
+                pr1, pr2, pr3, pr4, pr5, pr6 = st.columns(6)
+                with pr1:
+                    if st.button("👓 90제 미카엘라 드메2줄", use_container_width=True):
+                        st.session_state.est_name = "미카엘라의 새 안경 (90제 드메2줄)"
+                        st.session_state.est_lv = lv_list[0]; st.session_state.est_exact_lv = 90; st.session_state.est_part = MAPLE_EQUIP_PARTS[0]
+                        st.session_state.est_base = 1500.0; st.session_state.est_include_base = True; st.session_state.est_auc = 320000.0; st.session_state.est_val_shift = 0.0
+                        st.session_state.est_use_flm = False; st.session_state.est_use_scr = False; st.session_state.est_use_sf = False
+                        st.session_state.est_use_main = True; st.session_state.est_use_adi = False
+                        st.session_state.est_main_start = "에픽"
+                        st.session_state.est_main_opt = "[레전드리/장신구] 드랍+메획 총합 2줄 이상 (드메 2줄 핵심!)"
+                        st.rerun()
+                with pr2:
+                    if st.button("💍 17성 유니크 가성비", use_container_width=True):
+                        st.session_state.est_name = "17성 유니크 가성비 방어구/장신구"
+                        st.session_state.est_lv = lv_list[1]; st.session_state.est_exact_lv = 160; st.session_state.est_part = MAPLE_EQUIP_PARTS[0]
+                        st.session_state.est_base = 3000.0; st.session_state.est_include_base = True; st.session_state.est_auc = 95000.0; st.session_state.est_val_shift = 0.0
+                        st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 장신구/방어구 (추옵 보정 O)"
+                        st.session_state.est_use_scr = True; st.session_state.est_use_sf = True
+                        st.session_state.est_sf_start = 0; st.session_state.est_sf_target = 17
+                        st.session_state.est_use_main = True; st.session_state.est_use_adi = True
+                        st.session_state.est_main_start = "에픽"; st.session_state.est_main_opt = "[유니크] 주스탯 15% ~ 18% (유니크 2줄)"
+                        st.session_state.est_adi_start = "레어"; st.session_state.est_adi_opt = "[아랫잠/에픽] 공/마 +10 또는 주스탯 4%+ (에디 에픽 1.5~2줄)"
+                        st.rerun()
+                with pr3:
+                    if st.button("🔥 18성 레전27% 국민템", use_container_width=True):
+                        st.session_state.est_name = "18성 레전 27% 국민 본캐 템"
+                        st.session_state.est_lv = lv_list[1]; st.session_state.est_exact_lv = 160; st.session_state.est_part = MAPLE_EQUIP_PARTS[0]
+                        st.session_state.est_base = 5000.0; st.session_state.est_include_base = True; st.session_state.est_auc = 480000.0; st.session_state.est_val_shift = 0.0
+                        st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 장신구/방어구 (추옵 보정 O)"
+                        st.session_state.est_use_scr = True; st.session_state.est_use_sf = True
+                        st.session_state.est_sf_start = 0; st.session_state.est_sf_target = 18
+                        st.session_state.est_use_main = True; st.session_state.est_use_adi = True
+                        st.session_state.est_main_start = "에픽"; st.session_state.est_main_opt = "[레전드리] 주스탯 27% 이상 (준3줄 국민옵)"
+                        st.session_state.est_adi_start = "레어"; st.session_state.est_adi_opt = "[아랫잠/유니크] 에디 주스탯 2줄 or 공/마 2줄 (유니크 국민옵)"
+                        st.rerun()
+                with pr4:
+                    if st.button("👑 22성 레전30% 종결템", use_container_width=True):
+                        st.session_state.est_name = "22성 아케인/칠흑 종결 세팅"
+                        st.session_state.est_lv = lv_list[2]; st.session_state.est_exact_lv = 200; st.session_state.est_part = MAPLE_EQUIP_PARTS[1]
+                        st.session_state.est_base = 35000.0; st.session_state.est_include_base = True; st.session_state.est_auc = 2800000.0; st.session_state.est_val_shift = 0.0
+                        st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 장신구/방어구 (추옵 보정 O)"
+                        st.session_state.est_use_scr = True; st.session_state.est_use_sf = True
+                        st.session_state.est_sf_start = 0; st.session_state.est_sf_target = 22
+                        st.session_state.est_use_main = True; st.session_state.est_use_adi = True
+                        st.session_state.est_main_start = "에픽"; st.session_state.est_main_opt = "[레전드리] 주스탯 30% 이상 (3줄 정옵)"
+                        st.session_state.est_adi_start = "레어"; st.session_state.est_adi_opt = "[아랫잠/레전드리] 에디 주스탯 2.5~3줄 (준종결/종결)"
+                        st.rerun()
+                with pr5:
+                    if st.button("⚔️ 제네시스 해방무기 직작", use_container_width=True):
+                        st.session_state.est_name = "제네시스 해방 무기 (22성·15%완작 기본 지급)"
+                        st.session_state.est_lv = lv_list[2]; st.session_state.est_exact_lv = 200; st.session_state.est_part = MAPLE_EQUIP_PARTS[4]
+                        st.session_state.est_base = 0.0; st.session_state.est_include_base = False; st.session_state.est_auc = 0.0; st.session_state.est_val_shift = 0.0
+                        st.session_state.est_use_scis = False
+                        st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 무기 (아케인/해방무기 등)"
+                        st.session_state.est_use_scr = False; st.session_state.est_use_sf = False
+                        st.session_state.est_use_main = True; st.session_state.est_use_adi = True
+                        st.session_state.est_main_start = "유니크"; st.session_state.est_main_opt = "[레전드리/무보엠] 보공/공마 유효 3줄 (방무 제외)"
+                        st.session_state.est_adi_start = "에픽"; st.session_state.est_adi_opt = "[아랫잠/무보엠] 에디 공격력/마력 21% 이상 (2줄)"
+                        st.rerun()
+                with pr6:
+                    if st.button("🗡️ 해방전 18성 아케인무기", use_container_width=True):
+                        st.session_state.est_name = "해방 전 18성 아케인셰이드 무기 (중고 감가 -35%)"
+                        st.session_state.est_lv = lv_list[2]; st.session_state.est_exact_lv = 200; st.session_state.est_part = MAPLE_EQUIP_PARTS[4]
+                        st.session_state.est_base = 10000.0; st.session_state.est_include_base = True; st.session_state.est_auc = 350000.0; st.session_state.est_val_shift = -35.0
+                        st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 무기 (아케인/해방무기 등)"
+                        st.session_state.est_use_scr = True; st.session_state.est_use_sf = True
+                        st.session_state.est_sf_start = 0; st.session_state.est_sf_target = 18
+                        st.session_state.est_use_main = True; st.session_state.est_use_adi = True
+                        st.session_state.est_main_start = "에픽"; st.session_state.est_main_opt = "[레전드리/무보엠] 보공/방무/공마 유효 2줄"
+                        st.session_state.est_adi_start = "레어"; st.session_state.est_adi_opt = "[아랫잠/무보엠] 에디 공격력/마력 12%~15% (유니크/레전 1줄+)"
+                        st.rerun()
 
         e_col1, e_col2 = st.columns([1.2, 1.2], gap="large")
 
         with e_col1:
             with st.container(border=True):
-                st.markdown("##### 🛒 [기본 설정] 장비 레벨 · 노작가 · 경매장 완제품가 · 시세 보정(%)")
+                st.markdown("##### 🛒 [기본 설정] 장비 레벨 · 부위 필터 · 노작(스페어)가 · 비교할 매물가")
                 eval_item_name = st.text_input("아이템 이름", value=st.session_state.est_name)
                 st.session_state.est_name = eval_item_name
-                lv_list = list(MAPLE_CUBE_COST_TABLE["윗잠 (잠재능력)"].keys())
-                lv_idx = lv_list.index(st.session_state.est_lv) if st.session_state.est_lv in lv_list else 2
-                lv_bracket = st.selectbox("착용 레벨 구간 선택 (선택 즉시 모든 파트의 비용/주흔/스타포스가 자동 변경됩니다!)", lv_list, index=lv_idx)
-                st.session_state.est_lv = lv_bracket
+
+                lv_c1, lv_c2 = st.columns([1.3, 1.1])
+                with lv_c1:
+                    lv_idx = lv_list.index(st.session_state.est_lv)
+                    lv_bracket = st.selectbox("1. 잠재 레벨 구간 (2026 공식 4구간)", lv_list, index=lv_idx)
+                    if lv_bracket != st.session_state.est_lv:
+                        st.session_state.est_lv = lv_bracket
+                        st.session_state.est_exact_lv = BRACKET_DEFAULT_LV[lv_bracket]
+                with lv_c2:
+                    part_idx = MAPLE_EQUIP_PARTS.index(st.session_state.est_part)
+                    equip_part = st.selectbox("2. 장비 부위 (해당 부위 옵션만 표시!)", MAPLE_EQUIP_PARTS, index=part_idx)
+                    st.session_state.est_part = equip_part
+                part_short = equip_part.split(" ")[0]
 
                 b_c1, b_c2 = st.columns(2)
                 with b_c1:
-                    base_item_price = st.number_input("🛒 노작(베이스) 1개 매입가 (만 메소, 해방무기는 0)", min_value=0.0, value=float(st.session_state.est_base), step=1000.0, format="%.0f")
+                    base_item_price = st.number_input("🛒 노작(스페어) 1개 시세 (만 메소)", min_value=0.0, value=float(st.session_state.est_base), step=1000.0, format="%.0f")
                     st.session_state.est_base = base_item_price
-                    st.caption(f"환산: **{fmt_man(base_item_price, '메소')}** (스타포스 파괴 시 스페어 비용 자동 연동)")
+                    include_base = st.checkbox(
+                        f"초기 노작 1개값({fmt_man(base_item_price, '메소')})을 총원가에 합산",
+                        value=bool(st.session_state.est_include_base),
+                        help="반제품 매물(노작+윗잠)을 감정할 땐 켜두고, 이미 가진 템에 스타포스/추옵만 추가로 돌릴 땐 끄세요. (꺼도 스타포스 파괴 시 스페어 비용엔 자동 반영됩니다!)"
+                    )
+                    st.session_state.est_include_base = include_base
                 with b_c2:
-                    auction_finished_price = st.number_input("🏷️ 비교할 경매장 완제품 가격 (만 메소)", min_value=0.0, value=float(st.session_state.est_auc), step=10000.0, format="%.0f")
+                    auction_finished_price = st.number_input("🏷️ 비교할 경매장 매물 가격 (만 메소, 0=순수견적)", min_value=0.0, value=float(st.session_state.est_auc), step=10000.0, format="%.0f")
                     st.session_state.est_auc = auction_finished_price
-                    st.caption(f"환산: **{fmt_man(auction_finished_price, '메소')}**")
+                    st.caption(f"비교 매물가: **{fmt_man(auction_finished_price, '메소')}**")
 
                 sc_c1, sc_c2 = st.columns(2)
                 with sc_c1:
@@ -2009,130 +2109,30 @@ with tab_maple:
                         scissors_cost = 0.0
                 with sc_c2:
                     market_valuation_shift = st.number_input(
-                        "🎚️ 완제품 시장 시세 보정 / 중고 직작 감가율 (%)",
+                        "🎚️ 시장 시세 보정 / 중고 감가율 (%)",
                         min_value=-70.0, max_value=100.0, value=float(st.session_state.est_val_shift), step=5.0, format="%.1f",
-                        help="예: 해방 전 임시 아케인 무기처럼 중고 감가가 심한 품목은 -30% ~ -40%를 입력해 적정 중고가를 확인하세요!"
+                        help="완제품/반제품의 경매장 중고 감가를 반영하려면 -15% ~ -35% 등을 입력하세요."
                     )
                     st.session_state.est_val_shift = market_valuation_shift
 
-            # A단계: 추가옵션 (환생의 불꽃)
+            # [파트 1] 윗잠(잠재능력) - 가장 많이 조회하므로 최상단 배치!
             with st.container(border=True):
-                use_flame = st.checkbox("🔥 [파트 1] 추가옵션(환생의 불꽃) 견적 포함하기", value=st.session_state.est_use_flm)
-                st.session_state.est_use_flm = use_flame
-                flame_norm_cost = 0.0
-                flame_desc = "미포함"
-                if use_flame:
-                    fl_cats = list(MAPLE_FLAME_PRESETS.keys())
-                    default_fl_cat_idx = 1 if "71~110제" in lv_bracket else (fl_cats.index(st.session_state.est_fl_cat) if st.session_state.est_fl_cat in fl_cats else 0)
-                    fl_c1, fl_c2 = st.columns(2)
-                    with fl_c1:
-                        fl_cat = st.selectbox("장비 추옵 분류 (무기는 '보스 무기' 선택!)", fl_cats, index=default_fl_cat_idx)
-                        st.session_state.est_fl_cat = fl_cat
-                        fl_target = st.selectbox("목표 추옵 급수/옵션 (공식 소모량 자동 적용)", list(MAPLE_FLAME_PRESETS[fl_cat].keys()), index=min(2, len(MAPLE_FLAME_PRESETS[fl_cat])-1))
-                    with fl_c2:
-                        fl_type = st.radio("사용할 환불 종류", ["강력한 환생의 불꽃(강환불)", "영원한 환생의 불꽃(영환불)"], horizontal=True)
-                        is_eternal = "영환불" in fl_type
-                        default_fl_price = 1800.0 if is_eternal else 450.0
-                        fl_unit_price = st.number_input(
-                            f"💎 {'영환불' if is_eternal else '강환불'} 1개 시세 (만 메소)",
-                            min_value=1.0, value=default_fl_price, step=50.0, format="%.0f",
-                            key=f"fl_p_{is_eternal}"
-                        )
-                    fl_tries = MAPLE_FLAME_PRESETS[fl_cat][fl_target]["영환불" if is_eternal else "강환불"]
-                    flame_norm_cost = round(fl_tries * fl_unit_price, 1)
-                    flame_desc = f"{fl_target[:12]} (자동: 평균 {fl_tries:.1f}개 × {int(fl_unit_price)}만)"
-                    st.caption(f"👉 **자동 산출된 추옵 기대 원가: `{fmt_man(flame_norm_cost, '메소')}`** ({flame_desc})")
-
-            # B단계: 주문서 작
-            with st.container(border=True):
-                use_scroll = st.checkbox("📜 [파트 2] 주문서 작(주흔 15%/30%/70%/100% · 악공 · 놀긍) 견적 포함하기", value=st.session_state.est_use_scr)
-                st.session_state.est_use_scr = use_scroll
-                scroll_norm_cost = 0.0
-                scroll_event_cost = 0.0
-                scroll_desc = "미포함 (또는 해방무기 기본 15% 완작 지급)"
-                if use_scroll:
-                    sc_c1, sc_c2 = st.columns([1.4, 1.0])
-                    with sc_c1:
-                        sc_mode = st.selectbox("작 종류 선택", [
-                            "주문의 흔적 30% 완작 (방어구/장신구 본캐급)",
-                            "주문의 흔적 15% 완작 (무기/고스펙 방어구)",
-                            "주문의 흔적 70% 완작 (가성비/드메/부캐용)",
-                            "주문의 흔적 100% 완작",
-                            "✏️ 프악공 / 악공 / 매지컬 / 놀긍혼 완작 비용 직접 입력"
-                        ])
-                    with sc_c2:
-                        part_type = st.selectbox("장비 부위 (주흔 개수 자동 세팅)", list(AUTO_TRACE_SPEC[lv_bracket].keys()))
-
-                    if "직접 입력" in sc_mode:
-                        scroll_norm_cost = st.number_input("직접 입력: 총 작 완성 예상 비용 (만 메소)", min_value=0.0, value=15000.0, step=1000.0, format="%.0f")
-                        scroll_event_cost = scroll_norm_cost
-                        scroll_desc = "사용자 직접 입력 작 비용"
-                    else:
-                        auto_slots, auto_trace_per = AUTO_TRACE_SPEC[lv_bracket][part_type]
-                        trace_price = 2500.0
-                        css_cost = 450.0
-                        if st.checkbox("⚙️ 주흔 시세 / 슬롯 수 세부 조정하기 (기본값 자동 적용 중)", value=False):
-                            s_c1, s_c2, s_c3, s_c4 = st.columns(4)
-                            with s_c1:
-                                auto_slots = st.number_input("총 작 횟수", min_value=1, max_value=15, value=int(auto_slots), step=1)
-                            with s_c2:
-                                auto_trace_per = st.number_input("1회 소모 주흔", min_value=50, max_value=3000, value=int(auto_trace_per), step=50)
-                            with s_c3:
-                                trace_price = st.number_input("주흔 1개(메소)", min_value=500.0, value=2500.0, step=100.0, format="%.0f")
-                            with s_c4:
-                                css_cost = st.number_input("순백1회(만)", min_value=50.0, value=450.0, step=50.0, format="%.0f")
-
-                        scroll_norm_cost, _ = calc_scroll_expected_cost(sc_mode, auto_slots, auto_trace_per, trace_price, css_cost*2, css_cost, is_fever=False)
-                        scroll_event_cost, scroll_desc = calc_scroll_expected_cost(sc_mode, auto_slots, auto_trace_per, trace_price, css_cost*2, css_cost, is_fever=True)
-                        st.caption(
-                            f"👉 **자동 세팅({lv_bracket[:6]} {part_type[:3]}: {auto_slots}작 / 1회당 주흔 {auto_trace_per:,}개)** | "
-                            f"평일: **{fmt_man(scroll_norm_cost, '메소')}** / 🔥 **피버타임: `{fmt_man(scroll_event_cost, '메소')}`** ({scroll_desc})"
-                        )
-
-            # C단계: 스타포스
-            with st.container(border=True):
-                use_sf = st.checkbox("⭐ [파트 3] 스타포스 견적 포함하기 (레벨별 강화비 & 파괴 스페어 비용 자동 합산)", value=st.session_state.est_use_sf)
-                st.session_state.est_use_sf = use_sf
-                sf_norm_cost = 0.0
-                sf_event_cost = 0.0
-                sf_desc = "미포함 (또는 해방무기 기본 22성 지급)"
-                if use_sf:
-                    sf_goals = list(MAPLE_STARFORCE_TABLE[lv_bracket].keys())
-                    sf_g_idx = sf_goals.index(st.session_state.est_sf_goal) if st.session_state.est_sf_goal in sf_goals else 3
-                    sf_c1, sf_c2 = st.columns(2)
-                    with sf_c1:
-                        sf_target = st.selectbox("목표 스타포스 별 개수", sf_goals, index=sf_g_idx)
-                        st.session_state.est_sf_goal = sf_target
-                    with sf_c2:
-                        sf_ev_name = st.selectbox("썬데이 스타포스 이벤트 기준", list(STARFORCE_EVENTS.keys()), index=1)
-
-                    sf_base_info = MAPLE_STARFORCE_TABLE[lv_bracket][sf_target]
-                    ev_mults = STARFORCE_EVENTS[sf_ev_name]
-
-                    sf_norm_cost = sf_base_info["cost"] + (sf_base_info["booms"] * base_item_price)
-                    ev_booms = sf_base_info["booms"] * ev_mults["boom_mult"]
-                    sf_event_cost = (sf_base_info["cost"] * ev_mults["cost_mult"]) + (ev_booms * base_item_price)
-                    sf_desc = f"{sf_target[:3]} (자동: 평균 파괴 {ev_booms:.2f}회 × 스페어 {fmt_man(base_item_price, '메소')})"
-                    st.caption(f"👉 평일 스타포스: **{fmt_man(sf_norm_cost, '메소')}** / 🌟 **이벤트 적용 시: `{fmt_man(sf_event_cost, '메소')}`** ({sf_desc})")
-
-            # D단계: 윗잠(잠재능력)
-            with st.container(border=True):
-                use_main_pot = st.checkbox("🎲 [파트 4] 윗잠(잠재능력) 견적 포함하기 (`mesu.live` 확률·레벨별 비용 100% 자동 적용)", value=st.session_state.est_use_main)
+                use_main_pot = st.checkbox("🎲 [파트 1] 윗잠(잠재능력) 견적 포함하기 (2026 넥슨 공식 비용·확률)", value=st.session_state.est_use_main)
                 st.session_state.est_use_main = use_main_pot
                 main_norm_cost, main_mira_cost = 0.0, 0.0
                 main_p50_mira, main_p85_mira, main_p95_mira = 0.0, 0.0, 0.0
                 main_desc = "미포함"
                 if use_main_pot:
-                    m_opts = list(MAPLE_MAIN_POT_OPTIONS.keys())
-                    m_idx = m_opts.index(st.session_state.est_main_opt) if st.session_state.est_main_opt in m_opts else 0
+                    filtered_m_opts = [k for k, v in MAPLE_MAIN_POT_OPTIONS.items() if part_short in v["parts"]]
+                    m_idx = filtered_m_opts.index(st.session_state.est_main_opt) if st.session_state.est_main_opt in filtered_m_opts else 0
                     mc_top1, mc_top2 = st.columns([1.8, 1.0])
                     with mc_top1:
-                        main_opt_sel = st.selectbox("윗잠 목표 옵션 선택 (선택 즉시 확률/등급 자동 세팅!)", m_opts, index=m_idx)
+                        main_opt_sel = st.selectbox(f"윗잠 목표 옵션 ({part_short} 전용 필터 적용됨)", filtered_m_opts, index=m_idx)
                         st.session_state.est_main_opt = main_opt_sel
                     m_info = MAPLE_MAIN_POT_OPTIONS[main_opt_sel]
                     with mc_top2:
                         m_st_idx = TIER_ORDER.index(st.session_state.est_main_start) if st.session_state.est_main_start in TIER_ORDER else 1
-                        m_start_t = st.selectbox("윗잠 시작 등급 (해방무기는 유니크)", TIER_ORDER, index=m_st_idx)
+                        m_start_t = st.selectbox("윗잠 시작 등급", TIER_ORDER, index=m_st_idx)
                         st.session_state.est_main_start = m_start_t
 
                     m_targ_t = m_info["tier"]
@@ -2157,30 +2157,30 @@ with tab_maple:
                     main_p50_mira = m_tu_mira["p50_cost"] + m_opt_st["p50_cost"]
                     main_p85_mira = m_tu_mira["p85_cost"] + m_opt_st["p85_cost"]
                     main_p95_mira = m_tu_mira["p95_cost"] + m_opt_st["p95_cost"]
-                    main_desc = f"{main_opt_sel[:18]} (자동: {m_prob:.3f}% / 평균 {m_opt_st['mean_tries']:.1f}회 / 1회 {int(m_unit_c):,}만)"
+                    main_desc = f"{m_start_t}➔{m_targ_t} | {main_opt_sel[:16]} ({m_prob:.3f}% / 평균 {m_opt_st['mean_tries']:.1f}회)"
                     st.info(
-                        f"✅ **윗잠 자동 적용됨:** `{m_start_t} ➔ {m_targ_t}` | 1회 비용 **`{fmt_man(m_unit_c, '메소')}`** | 공식 확률 **`{m_prob:.4f}%`** (평균 **`{m_opt_st['mean_tries']:.1f}회`**)\n"
-                        f"👉 평일 기대 원가: **{fmt_man(main_norm_cost, '메소')}** / ✨ **미라클 데이 원가: `{fmt_man(main_mira_cost, '메소')}`**"
+                        f"✅ **윗잠 공식 견적:** `{m_start_t} ➔ {m_targ_t}` | 1회 **`{fmt_man(m_unit_c, '메소')}`** | 확률 **`{m_prob:.4f}%`** (평균 **`{m_opt_st['mean_tries']:.1f}회`**)\n"
+                        f"👉 평일 기대값: **{fmt_man(main_norm_cost, '메소')}** / ✨ **미라클 데이: `{fmt_man(main_mira_cost, '메소')}`**"
                     )
 
-            # E단계: 아랫잠(에디셔널)
+            # [파트 2] 아랫잠(에디셔널) - 2026 공식 비용/확률/천장 반영
             with st.container(border=True):
-                use_adi_pot = st.checkbox("✨ [파트 5] 아랫잠(에디셔널) 견적 동시 포함하기 (`mesu.live` 확률·레벨별 비용 100% 자동 적용)", value=st.session_state.est_use_adi)
+                use_adi_pot = st.checkbox("✨ [파트 2] 아랫잠(에디셔널) 견적 포함하기 (2026 넥슨 공식 비용·확률·천장)", value=st.session_state.est_use_adi)
                 st.session_state.est_use_adi = use_adi_pot
                 adi_norm_cost, adi_mira_cost = 0.0, 0.0
                 adi_p50_mira, adi_p85_mira, adi_p95_mira = 0.0, 0.0, 0.0
                 adi_desc = "미포함"
                 if use_adi_pot:
-                    a_opts = list(MAPLE_ADI_POT_OPTIONS.keys())
-                    a_idx = a_opts.index(st.session_state.est_adi_opt) if st.session_state.est_adi_opt in a_opts else 1
+                    filtered_a_opts = [k for k, v in MAPLE_ADI_POT_OPTIONS.items() if part_short in v["parts"]]
+                    a_idx = filtered_a_opts.index(st.session_state.est_adi_opt) if st.session_state.est_adi_opt in filtered_a_opts else 0
                     ac_top1, ac_top2 = st.columns([1.8, 1.0])
                     with ac_top1:
-                        adi_opt_sel = st.selectbox("아랫잠 목표 옵션 선택 (선택 즉시 확률/등급 자동 세팅!)", a_opts, index=a_idx)
+                        adi_opt_sel = st.selectbox(f"아랫잠 목표 옵션 ({part_short} 전용 필터 적용됨)", filtered_a_opts, index=a_idx)
                         st.session_state.est_adi_opt = adi_opt_sel
                     a_info = MAPLE_ADI_POT_OPTIONS[adi_opt_sel]
                     with ac_top2:
                         a_st_idx = TIER_ORDER.index(st.session_state.est_adi_start) if st.session_state.est_adi_start in TIER_ORDER else 0
-                        a_start_t = st.selectbox("아랫잠 시작 등급 (해방무기는 에픽)", TIER_ORDER, index=a_st_idx)
+                        a_start_t = st.selectbox("아랫잠 시작 등급", TIER_ORDER, index=a_st_idx)
                         st.session_state.est_adi_start = a_start_t
 
                     a_targ_t = a_info["tier"]
@@ -2205,115 +2205,254 @@ with tab_maple:
                     adi_p50_mira = a_tu_mira["p50_cost"] + a_opt_st["p50_cost"]
                     adi_p85_mira = a_tu_mira["p85_cost"] + a_opt_st["p85_cost"]
                     adi_p95_mira = a_tu_mira["p95_cost"] + a_opt_st["p95_cost"]
-                    adi_desc = f"{adi_opt_sel[:18]} (자동: {a_prob:.3f}% / 평균 {a_opt_st['mean_tries']:.1f}회 / 1회 {int(a_unit_c):,}만)"
+                    adi_desc = f"{a_start_t}➔{a_targ_t} | {adi_opt_sel[:16]} ({a_prob:.3f}% / 평균 {a_opt_st['mean_tries']:.1f}회)"
                     st.info(
-                        f"✅ **아랫잠 자동 적용됨:** `{a_start_t} ➔ {a_targ_t}` | 1회 비용 **`{fmt_man(a_unit_c, '메소')}`** | 공식 확률 **`{a_prob:.4f}%`** (평균 **`{a_opt_st['mean_tries']:.1f}회`**)\n"
-                        f"👉 평일 기대 원가: **{fmt_man(adi_norm_cost, '메소')}** / ✨ **미라클 데이 원가: `{fmt_man(adi_mira_cost, '메소')}`**"
+                        f"✅ **아랫잠 공식 견적:** `{a_start_t} ➔ {a_targ_t}` | 1회 **`{fmt_man(a_unit_c, '메소')}`** | 확률 **`{a_prob:.4f}%`** (평균 **`{a_opt_st['mean_tries']:.1f}회`**)\n"
+                        f"👉 평일 기대값: **{fmt_man(adi_norm_cost, '메소')}** / ✨ **미라클 데이: `{fmt_man(adi_mira_cost, '메소')}`**"
                     )
 
-        # 오른쪽 컬럼: 올인원 종합 영수증 & 시장 보정% 반영 최종 판정
+            # [파트 3] 스타포스 - 2025 개편 넥슨 공식 수식 + 시작→목표 구간 계산
+            with st.container(border=True):
+                use_sf = st.checkbox("⭐ [파트 3] 스타포스 견적 포함하기 (2025 개편 넥슨 공식 수식 · 시작➔목표 구간 계산)", value=st.session_state.est_use_sf)
+                st.session_state.est_use_sf = use_sf
+                sf_norm_cost = 0.0
+                sf_event_cost = 0.0
+                sf_desc = "미포함"
+                if use_sf:
+                    sf_r1, sf_r2, sf_r3 = st.columns(3)
+                    with sf_r1:
+                        exact_lv = st.number_input("장비 착용 레벨 (예: 140/150/160/200/250)", min_value=70, max_value=300, value=int(st.session_state.est_exact_lv), step=10, key=f"sf_lv_{lv_bracket}")
+                        st.session_state.est_exact_lv = exact_lv
+                    with sf_r2:
+                        sf_start = st.number_input("현재(시작) 성수", min_value=0, max_value=21, value=int(st.session_state.est_sf_start), step=1)
+                        st.session_state.est_sf_start = sf_start
+                    with sf_r3:
+                        sf_t_default = max(sf_start + 1, min(22, int(st.session_state.est_sf_target)))
+                        sf_target = st.number_input("목표 성수", min_value=sf_start + 1, max_value=22, value=sf_t_default, step=1)
+                        st.session_state.est_sf_target = sf_target
+
+                    sf_ev_list = list(STARFORCE_EVENTS.keys())
+                    sf_ev_idx = sf_ev_list.index(st.session_state.est_sf_ev) if st.session_state.est_sf_ev in sf_ev_list else 3
+                    sf_ev_name = st.selectbox("스타포스 이벤트 선택", sf_ev_list, index=sf_ev_idx)
+                    st.session_state.est_sf_ev = sf_ev_name
+
+                    sf_o1, sf_o2 = st.columns(2)
+                    with sf_o1:
+                        sf_sg = st.checkbox("🛡️ 15~17성 파괴방지 적용 (+200% 비용)", value=bool(st.session_state.est_sf_sg))
+                        st.session_state.est_sf_sg = sf_sg
+                    with sf_o2:
+                        sf_sc = st.checkbox("🎯 스타캐치 성공 적용 (성공률 ×1.05)", value=bool(st.session_state.est_sf_sc))
+                        st.session_state.est_sf_sc = sf_sc
+
+                    sf_norm_res = calc_starforce_expected(exact_lv, sf_start, sf_target, base_item_price, "📅 노이벤트 (평일 기준)", sf_sg, sf_sc)
+                    sf_ev_res = calc_starforce_expected(exact_lv, sf_start, sf_target, base_item_price, sf_ev_name, sf_sg, sf_sc)
+
+                    sf_norm_cost = sf_norm_res["total_cost"]
+                    sf_event_cost = sf_ev_res["total_cost"]
+                    sf_desc = f"{exact_lv}제 {sf_start}➔{sf_target}성 (강화비 {fmt_man(sf_ev_res['meso_cost'], '메소')} + 파괴 {sf_ev_res['booms']:.2f}회)"
+                    st.info(
+                        f"⭐ **{exact_lv}제 `{sf_start}성 ➔ {sf_target}성` 넥슨 공식 기댓값 ({'파방O' if sf_sg else '파방X'} / {'스타캐치O' if sf_sc else 'X'}):**\n"
+                        f"- 평일 총합: **{fmt_man(sf_norm_cost, '메소')}** (메소 {fmt_man(sf_norm_res['meso_cost'], '메소')} + 평균 파괴 `{sf_norm_res['booms']:.2f}회`)\n"
+                        f"- ✨ **선택 이벤트 총합: `{fmt_man(sf_event_cost, '메소')}`** (메소 `{fmt_man(sf_ev_res['meso_cost'], '메소')}` + 파괴 스페어 `{fmt_man(sf_ev_res['spare_cost'], '메소')}` / 평균 `{sf_ev_res['booms']:.2f}회`)"
+                    )
+
+            # [파트 4] 추가옵션 (환생의 불꽃)
+            with st.container(border=True):
+                use_flame = st.checkbox("🔥 [파트 4] 추가옵션(환생의 불꽃) 견적 포함하기", value=st.session_state.est_use_flm)
+                st.session_state.est_use_flm = use_flame
+                flame_norm_cost = 0.0
+                flame_desc = "미포함"
+                if use_flame:
+                    fl_cats = list(MAPLE_FLAME_PRESETS.keys())
+                    if part_short == "무보엠":
+                        default_fl_cat_idx = 2
+                    elif st.session_state.est_fl_cat in fl_cats:
+                        default_fl_cat_idx = fl_cats.index(st.session_state.est_fl_cat)
+                    else:
+                        default_fl_cat_idx = 0
+                    fl_c1, fl_c2 = st.columns(2)
+                    with fl_c1:
+                        fl_cat = st.selectbox("장비 추옵 분류", fl_cats, index=default_fl_cat_idx)
+                        st.session_state.est_fl_cat = fl_cat
+                        fl_target = st.selectbox("목표 추옵 급수/옵션", list(MAPLE_FLAME_PRESETS[fl_cat].keys()), index=min(2, len(MAPLE_FLAME_PRESETS[fl_cat])-1))
+                    with fl_c2:
+                        fl_type = st.radio("사용할 환불 종류", ["강력한 환생의 불꽃(강환불)", "영원한 환생의 불꽃(영환불)"], horizontal=True)
+                        is_eternal = "영환불" in fl_type
+                        default_fl_price = 1800.0 if is_eternal else 450.0
+                        fl_unit_price = st.number_input(
+                            f"💎 {'영환불' if is_eternal else '강환불'} 1개 시세 (만 메소)",
+                            min_value=1.0, value=default_fl_price, step=50.0, format="%.0f",
+                            key=f"fl_p_{is_eternal}"
+                        )
+                    fl_tries = MAPLE_FLAME_PRESETS[fl_cat][fl_target]["영환불" if is_eternal else "강환불"]
+                    flame_norm_cost = round(fl_tries * fl_unit_price, 1)
+                    flame_desc = f"{fl_target[:14]} (평균 {fl_tries:.1f}개 × {int(fl_unit_price)}만)"
+                    st.caption(f"👉 **추옵 기대 원가: `{fmt_man(flame_norm_cost, '메소')}`** ({flame_desc})")
+
+            # [파트 5] 주문서 작
+            with st.container(border=True):
+                use_scroll = st.checkbox("📜 [파트 5] 주문서 작(주흔 15%/30%/70%/100% · 악공 · 놀긍) 견적 포함하기", value=st.session_state.est_use_scr)
+                st.session_state.est_use_scr = use_scroll
+                scroll_norm_cost = 0.0
+                scroll_event_cost = 0.0
+                scroll_desc = "미포함"
+                if use_scroll:
+                    sc_c1, sc_c2 = st.columns([1.4, 1.0])
+                    with sc_c1:
+                        sc_mode = st.selectbox("작 종류 선택", [
+                            "주문의 흔적 30% 완작 (방어구/장신구 본캐급)",
+                            "주문의 흔적 15% 완작 (무기/고스펙 방어구)",
+                            "주문의 흔적 70% 완작 (가성비/드메/부캐용)",
+                            "주문의 흔적 100% 완작",
+                            "✏️ 프악공 / 악공 / 매지컬 / 놀긍혼 완작 비용 직접 입력"
+                        ])
+                    with sc_c2:
+                        part_keys = list(AUTO_TRACE_SPEC[lv_bracket].keys())
+                        def_p_idx = 2 if part_short == "무보엠" else (0 if part_short == "장신구" else 1)
+                        part_type = st.selectbox("장비 부위 (주흔 자동 세팅)", part_keys, index=def_p_idx)
+
+                    if "직접 입력" in sc_mode:
+                        scroll_norm_cost = st.number_input("직접 입력: 총 작 완성 예상 비용 (만 메소)", min_value=0.0, value=15000.0, step=1000.0, format="%.0f")
+                        scroll_event_cost = scroll_norm_cost
+                        scroll_desc = "사용자 직접 입력 작 비용"
+                    else:
+                        auto_slots, auto_trace_per = AUTO_TRACE_SPEC[lv_bracket][part_type]
+                        trace_price = 2500.0
+                        css_cost = 450.0
+                        if st.checkbox("⚙️ 주흔 시세 / 슬롯 수 세부 조정하기", value=False):
+                            s_c1, s_c2, s_c3, s_c4 = st.columns(4)
+                            with s_c1:
+                                auto_slots = st.number_input("총 작 횟수", min_value=1, max_value=15, value=int(auto_slots), step=1)
+                            with s_c2:
+                                auto_trace_per = st.number_input("1회 소모 주흔", min_value=50, max_value=3000, value=int(auto_trace_per), step=50)
+                            with s_c3:
+                                trace_price = st.number_input("주흔 1개(메소)", min_value=500.0, value=2500.0, step=100.0, format="%.0f")
+                            with s_c4:
+                                css_cost = st.number_input("순백1회(만)", min_value=50.0, value=450.0, step=50.0, format="%.0f")
+
+                        scroll_norm_cost, _ = calc_scroll_expected_cost(sc_mode, auto_slots, auto_trace_per, trace_price, css_cost*2, css_cost, is_fever=False)
+                        scroll_event_cost, scroll_desc = calc_scroll_expected_cost(sc_mode, auto_slots, auto_trace_per, trace_price, css_cost*2, css_cost, is_fever=True)
+                        st.caption(
+                            f"👉 **자동 세팅({auto_slots}작 / 1회당 주흔 {auto_trace_per:,}개)** | "
+                            f"평일: **{fmt_man(scroll_norm_cost, '메소')}** / 🔥 **피버타임: `{fmt_man(scroll_event_cost, '메소')}`** ({scroll_desc})"
+                        )
+
+        # 오른쪽 컬럼: 선택 파트 요약 영수증 & 반제품/완제품 즉시 판정
         with e_col2:
             with st.container(border=True):
-                st.markdown("##### 🧾 올인원(All-in-One) 완제품 원가 영수증 & AI 매물 감정 결과")
+                active_names = []
+                if use_main_pot: active_names.append("🎲윗잠")
+                if use_adi_pot: active_names.append("✨아랫잠")
+                if use_sf: active_names.append(f"⭐스타포스({st.session_state.est_sf_start}➔{st.session_state.est_sf_target}성)")
+                if use_flame: active_names.append("🔥추옵")
+                if use_scroll: active_names.append("📜작")
+                mode_badge = " + ".join(active_names) if active_names else "선택된 작업 없음"
 
-                fixed_base_part = base_item_price + scissors_cost + flame_norm_cost
-                grand_total_normal = fixed_base_part + scroll_norm_cost + sf_norm_cost + main_norm_cost + adi_norm_cost
-                grand_total_event = fixed_base_part + scroll_event_cost + sf_event_cost + main_mira_cost + adi_mira_cost
+                st.markdown(f"##### 🧾 공식 견적 영수증 | 현재 계산 범위: **`{mode_badge}`**")
+
+                base_add = base_item_price if include_base else 0.0
+                work_only_normal = flame_norm_cost + scroll_norm_cost + sf_norm_cost + main_norm_cost + adi_norm_cost
+                work_only_event = flame_norm_cost + scroll_event_cost + sf_event_cost + main_mira_cost + adi_mira_cost
+
+                grand_total_normal = base_add + scissors_cost + work_only_normal
+                grand_total_event = base_add + scissors_cost + work_only_event
 
                 val_mult = 1.0 + (market_valuation_shift / 100.0)
-                fair_market_normal = grand_total_normal * val_mult
                 fair_market_event = grand_total_event * val_mult
 
                 m_top1, m_top2, m_top3 = st.columns(3)
-                m_top1.metric("📅 평일 직작 총 원가", fmt_man(grand_total_normal, "메소"), "노이벤트 기준")
-                m_top2.metric("✨ 이벤트 풀활용 총 원가", fmt_man(grand_total_event, "메소"), f"평일 대비 -{fmt_man(grand_total_normal - grand_total_event, '메소')} 절약")
+                m_top1.metric("🛠️ 순수 작업 기대 원가 (이벤트)", fmt_man(work_only_event, "메소"), f"평일: {fmt_man(work_only_normal, '메소')}")
+                m_top2.metric("✨ 총 직작 원가 (이벤트)", fmt_man(grand_total_event, "메소"), f"{'노작 포함' if include_base else '노작 제외'} | 평일 대비 -{fmt_man(grand_total_normal - grand_total_event, '메소')}")
                 m_top3.metric(
-                    f"⚖️ 보정({market_valuation_shift:+.0f}%) 적정 시세",
+                    f"⚖️ 보정({market_valuation_shift:+.0f}%) 적정가",
                     fmt_man(fair_market_event, "메소"),
-                    f"현재 경매장가: {fmt_man(auction_finished_price, '메소')}"
+                    f"경매장 매물가: {fmt_man(auction_finished_price, '메소')}" if auction_finished_price > 0 else "순수 직작 견적 모드"
                 )
 
-                receipt_rows = [
-                    {"제작 단계": "🛒 0. 노작 베이스 + 가위값", "평일 원가": fmt_man(base_item_price + scissors_cost, "메소"), "✨이벤트(미라클/피버/썬데이) 원가": fmt_man(base_item_price + scissors_cost, "메소"), "자동 적용된 스펙/근거": f"노작 {fmt_man(base_item_price, '메소')} + 가위 {fmt_man(scissors_cost, '메소')}"},
-                    {"제작 단계": "🔥 1. 추가옵션 (환불)", "평일 원가": fmt_man(flame_norm_cost, "메소"), "✨이벤트(미라클/피버/썬데이) 원가": fmt_man(flame_norm_cost, "메소"), "자동 적용된 스펙/근거": flame_desc},
-                    {"제작 단계": "📜 2. 주문서 작 (주흔/기타)", "평일 원가": fmt_man(scroll_norm_cost, "메소"), "✨이벤트(미라클/피버/썬데이) 원가": fmt_man(scroll_event_cost, "메소"), "자동 적용된 스펙/근거": scroll_desc},
-                    {"제작 단계": "⭐ 3. 스타포스 (스페어포함)", "평일 원가": fmt_man(sf_norm_cost, "메소"), "✨이벤트(미라클/피버/썬데이) 원가": fmt_man(sf_event_cost, "메소"), "자동 적용된 스펙/근거": sf_desc},
-                    {"제작 단계": "🎲 4. 윗잠재능력 (잠재)", "평일 원가": fmt_man(main_norm_cost, "메소"), "✨이벤트(미라클/피버/썬데이) 원가": fmt_man(main_mira_cost, "메소"), "자동 적용된 스펙/근거": main_desc},
-                    {"제작 단계": "✨ 5. 아랫잠재능력 (에디)", "평일 원가": fmt_man(adi_norm_cost, "메소"), "✨이벤트(미라클/피버/썬데이) 원가": fmt_man(adi_mira_cost, "메소"), "자동 적용된 스펙/근거": adi_desc},
-                ]
-                st.dataframe(pd.DataFrame(receipt_rows), use_container_width=True, hide_index=True)
+                receipt_rows = []
+                if include_base or scissors_cost > 0:
+                    receipt_rows.append({"항목": "🛒 초기 노작 + 가위", "평일 원가": fmt_man(base_add + scissors_cost, "메소"), "✨이벤트 원가": fmt_man(base_add + scissors_cost, "메소"), "세부 근거": f"노작 {fmt_man(base_add, '메소')} + 가위 {fmt_man(scissors_cost, '메소')}"})
+                if use_main_pot:
+                    receipt_rows.append({"항목": "🎲 윗잠재능력", "평일 원가": fmt_man(main_norm_cost, "메소"), "✨이벤트 원가": fmt_man(main_mira_cost, "메소"), "세부 근거": main_desc})
+                if use_adi_pot:
+                    receipt_rows.append({"항목": "✨ 아랫잠재능력", "평일 원가": fmt_man(adi_norm_cost, "메소"), "✨이벤트 원가": fmt_man(adi_mira_cost, "메소"), "세부 근거": adi_desc})
+                if use_sf:
+                    receipt_rows.append({"항목": "⭐ 스타포스", "평일 원가": fmt_man(sf_norm_cost, "메소"), "✨이벤트 원가": fmt_man(sf_event_cost, "메소"), "세부 근거": sf_desc})
+                if use_flame:
+                    receipt_rows.append({"항목": "🔥 추가옵션", "평일 원가": fmt_man(flame_norm_cost, "메소"), "✨이벤트 원가": fmt_man(flame_norm_cost, "메소"), "세부 근거": flame_desc})
+                if use_scroll:
+                    receipt_rows.append({"항목": "📜 주문서 작", "평일 원가": fmt_man(scroll_norm_cost, "메소"), "✨이벤트 원가": fmt_man(scroll_event_cost, "메소"), "세부 근거": scroll_desc})
 
-                non_pot_event_base = fixed_base_part + scroll_event_cost + sf_event_cost
-                p50_tot = non_pot_event_base + main_p50_mira + adi_p50_mira
-                p85_tot = non_pot_event_base + main_p85_mira + adi_p85_mira
-                p95_tot = non_pot_event_base + main_p95_mira + adi_p95_mira
-                st.caption(
-                    f"📊 **잠재능력 운빨 분포 포함 총 제작비 (이벤트 날 기준):** "
-                    f"🍀 상위 50%(중앙값) **`{fmt_man(p50_tot, '메소')}`** | "
-                    f"🛡️ 85% 안전선 **`{fmt_man(p85_tot, '메소')}`** | "
-                    f"⚠️ 95% 억까선 **`{fmt_man(p95_tot, '메소')}`**"
-                )
+                if receipt_rows:
+                    st.dataframe(pd.DataFrame(receipt_rows), use_container_width=True, hide_index=True)
+                else:
+                    st.warning("왼쪽에서 계산할 파트를 1개 이상 체크하거나 위 단품 버튼을 눌러주세요.")
+
+                if use_main_pot or use_adi_pot:
+                    non_pot_event_base = base_add + scissors_cost + flame_norm_cost + scroll_event_cost + sf_event_cost
+                    p50_tot = non_pot_event_base + main_p50_mira + adi_p50_mira
+                    p85_tot = non_pot_event_base + main_p85_mira + adi_p85_mira
+                    p95_tot = non_pot_event_base + main_p95_mira + adi_p95_mira
+                    st.caption(
+                        f"📊 **잠재 운빨 분포 반영 총 비용 (이벤트 기준):** "
+                        f"🍀 상위 50%(중앙값) **`{fmt_man(p50_tot, '메소')}`** | "
+                        f"🛡️ 85% 안전선 **`{fmt_man(p85_tot, '메소')}`** | "
+                        f"⚠️ 95% 억까선 **`{fmt_man(p95_tot, '메소')}`**"
+                    )
 
                 st.divider()
 
                 if auction_finished_price <= 0:
-                    st.info("💡 **순수 직작 견적 모드 (제네시스 해방 무기 등 교환불가 장비):** 위 영수증의 **`✨이벤트 풀활용 총 원가`**와 **`상위 50%~85% 안전선`** 예산을 목표로 메소를 모으시면 됩니다!")
+                    st.info(
+                        f"💡 **순수 기대값 조회 모드:** 선택하신 **`[{mode_badge}]`**의 넥슨 공식 평균 기대 원가는 "
+                        f"평일 **`{fmt_man(grand_total_normal, '메소')}`**, 이벤트 날 **`{fmt_man(grand_total_event, '메소')}`**입니다."
+                    )
                 else:
+                    diff_from_fair = auction_finished_price - fair_market_event
+                    st.markdown(f"###### 🛒 판정 1 (구매자 관점): 경매장 매물가(`{fmt_man(auction_finished_price, '메소')}`) vs 보정 직작 원가(`{fmt_man(fair_market_event, '메소')}`)")
+                    if diff_from_fair < 0:
+                        st.success(
+                            f"💎 **[꿀매물 / 사서 쓰는 게 이득!]** 경매장 매물이 넥슨 공식 직작 기대 원가(보정 {market_valuation_shift:+.0f}% 반영)보다 "
+                            f"**`{fmt_man(abs(diff_from_fair), '메소')}` 더 저렴합니다!** 직접 돌리지 말고 이 매물을 사서 마감하시는 게 이득입니다."
+                        )
+                    else:
+                        st.warning(
+                            f"🛠️ **[거품 매물 / 직작 우위]** 경매장 매물이 공식 직작 원가보다 **`+{fmt_man(diff_from_fair, '메소')}` 비쌉니다.** "
+                            f"더 싼 매물을 찾거나 이벤트 날 직접 작업하는 편이 유리합니다."
+                        )
+
                     net_sell_revenue = auction_finished_price * fee_mult
                     flip_profit_event = net_sell_revenue - grand_total_event
                     flip_profit_normal = net_sell_revenue - grand_total_normal
 
-                    st.markdown(f"###### ⚖️ 판정 1: 직접 풀세팅 제작 후 경매장에 `{fmt_man(auction_finished_price, '메소')}`에 팔 때 (장사꾼 관점)")
+                    st.markdown(f"###### ⚖️ 판정 2 (장사꾼 관점): 직접 만들어 `{fmt_man(auction_finished_price, '메소')}`에 팔 때 (수수료 {fee_pct_str} 공제)")
                     if flip_profit_event > 0 and flip_profit_normal > 0:
-                        st.success(
-                            f"🟢 **[직작 장사 강력 추천!]** 평일에 만들어 팔아도 평균 **`+{fmt_man(flip_profit_normal, '메소')}`** 이득이며, "
-                            f"**✨이벤트 날(미라클/썬데이)**에 제작해 팔면 수수료({fee_pct_str})를 떼고도 평균 **`+{fmt_man(flip_profit_event, '메소')}`**의 순마진이 남습니다!"
-                        )
-                    elif flip_profit_event > 0 and flip_profit_normal <= 0:
-                        st.warning(
-                            f"🟡 **[이벤트 데이 전용 장사템!]** 평일에 만들면 **`{fmt_man(flip_profit_normal, '메소')}` 적자**지만, "
-                            f"**✨미라클/썬데이 이벤트**를 활용해 만들면 평균 **`+{fmt_man(flip_profit_event, '메소')}` 흑자**가 납니다!"
-                        )
+                        st.info(f"🟢 **[직작 장사 강력 추천]** 평일 평균 **`+{fmt_man(flip_profit_normal, '메소')}`** / ✨이벤트 평균 **`+{fmt_man(flip_profit_event, '메소')}`** 순마진!")
+                    elif flip_profit_event > 0:
+                        st.info(f"🟡 **[이벤트 전용 장사]** 평일은 적자(`{fmt_man(flip_profit_normal, '메소')}`)지만, ✨이벤트 날 제작 시 평균 **`+{fmt_man(flip_profit_event, '메소')}`** 흑자!")
                     else:
-                        st.error(
-                            f"🔴 **[직작 장사 금지 - 적자 경고!]** 이벤트 날에 모든 할인을 받아 만들어도 평균 **`{fmt_man(flip_profit_event, '메소')}` 손해**입니다! "
-                            f"절대 직접 만들어 팔지 마세요."
-                        )
+                        st.error(f"🔴 **[직작 판매 적자 경고]** 이벤트 날 만들어 팔아도 평균 **`{fmt_man(flip_profit_event, '메소')}` 손해**입니다.")
 
-                    diff_from_fair = auction_finished_price - fair_market_event
-                    st.markdown(f"###### 🛒 판정 2: 현재 경매장 매물가(`{fmt_man(auction_finished_price, '메소')}`) vs 보정 적정 시세(`{fmt_man(fair_market_event, '메소')}`)")
-                    if diff_from_fair < 0:
-                        st.info(
-                            f"💎 **[꿀매물 / 완제품 구매 추천!]** 현재 경매장 가격이 시장 보정({market_valuation_shift:+.0f}%)을 감안한 적정 제작가보다도 "
-                            f"**`{fmt_man(abs(diff_from_fair), '메소')}` 더 저렴합니다!** 직접 만들지 말고 경매장 매물을 바로 구매하시는 것이 무조건 이득입니다."
-                        )
-                    else:
-                        st.info(
-                            f"🛠️ **[경매장 거품 / 직작 우위]** 경매장 매물이 적정 시세보다 **`+{fmt_man(diff_from_fair, '메소')}` 비싸게** 올라와 있습니다. "
-                            f"급하지 않다면 이벤트 날 직접 제작하거나 가격 흥정을 추천합니다."
-                        )
-
-                if st.button("📌 이 올인원 종합 견적을 아래 비교 리스트에 저장하기", use_container_width=True):
+                if st.button("📌 이 견적을 아래 비교 리스트에 저장하기", use_container_width=True):
                     net_s = auction_finished_price * fee_mult
                     fp_ev = net_s - grand_total_event
                     df_fair = auction_finished_price - fair_market_event
                     mp_data["saved_evals"].append({
                         "아이템명": eval_item_name,
-                        "레벨구간": lv_bracket[:7],
-                        "세팅요약": f"{sf_desc[:3] if use_sf else '노성'}/{main_desc[:10] if use_main_pot else '노윗잠'}/{adi_desc[:10] if use_adi_pot else '노에디'}",
-                        "평일총원가": fmt_man(grand_total_normal, "메소"),
-                        "✨이벤트총원가": fmt_man(grand_total_event, "메소"),
-                        f"보정시세({market_valuation_shift:+.0f}%)": fmt_man(fair_market_event, "메소"),
-                        "경매장매물가": fmt_man(auction_finished_price, "메소") if auction_finished_price > 0 else "교불(직작)",
-                        "장사순마진": (f"+{fmt_man(fp_ev, '메소')}" if fp_ev >= 0 else fmt_man(fp_ev, "메소")) if auction_finished_price > 0 else "-",
-                        "최종판정": "⚔️해방/교불직작" if auction_finished_price <= 0 else ("🟢직작장사추천" if fp_ev > 0 else ("💎완제꿀매물" if df_fair < 0 else "🔴관망"))
+                        "부위/구간": f"{part_short}({lv_bracket[:7]})",
+                        "계산범위": mode_badge,
+                        "평일원가": fmt_man(grand_total_normal, "메소"),
+                        "✨이벤트원가": fmt_man(grand_total_event, "메소"),
+                        f"보정가({market_valuation_shift:+.0f}%)": fmt_man(fair_market_event, "메소"),
+                        "경매장가": fmt_man(auction_finished_price, "메소") if auction_finished_price > 0 else "순수견적",
+                        "판정": "📋순수견적" if auction_finished_price <= 0 else ("💎매물꿀매" if df_fair < 0 else ("🟢직작장사" if fp_ev > 0 else "🔴관망"))
                     })
                     save_json_local(MAPLE_FILE, mp_data)
                     st.session_state.mp_dirty = True
                     st.rerun()
 
         if mp_data.get("saved_evals"):
-            with st.expander("📋 내가 저장해 둔 올인원 종합 견적 비교 리스트", expanded=True):
+            with st.expander("📋 내가 저장해 둔 견적 비교 리스트", expanded=True):
                 st.dataframe(pd.DataFrame(mp_data["saved_evals"]), use_container_width=True, hide_index=True)
                 if st.button("🗑️ 저장된 비교 리스트 비우기"):
                     mp_data["saved_evals"] = []
@@ -2321,8 +2460,8 @@ with tab_maple:
 
         st.divider()
 
-        with st.expander("📚 [데이터 총람] mesu.live 기준 잠재/스타포스/추옵 AI 산출 수치 원본 표 보기", expanded=False):
-            st.markdown("##### 📌 1. 레벨 구간별 1회 잠재능력 재설정 비용 정가표")
+        with st.expander("📚 [2026 넥슨 공식 데이터 총람] 잠재 4구간 정가표 · 에디 천장 기댓값 · 개편 스타포스 공식표", expanded=False):
+            st.markdown("##### 📌 1. 2026 넥슨 공식 잠재능력 1회 재설정 비용 정가표 (4구간)")
             cost_guide_rows = []
             for c_type, brackets in MAPLE_CUBE_COST_TABLE.items():
                 for brk, tiers in brackets.items():
@@ -2333,7 +2472,7 @@ with tab_maple:
                     })
             st.dataframe(pd.DataFrame(cost_guide_rows), use_container_width=True, hide_index=True)
 
-            st.markdown("##### 📌 2. 레벨 구간별 등급업(천장 시스템 반영) 기댓값 비교표")
+            st.markdown("##### 📌 2. 2026 공식 등급업(천장 반영) 에픽 ➔ 레전드리 기댓값")
             tier_guide_rows = []
             for c_type, brackets in MAPLE_CUBE_COST_TABLE.items():
                 for brk in brackets.keys():
@@ -2343,10 +2482,26 @@ with tab_maple:
                         "구분": c_type, "레벨 구간": brk,
                         "에픽->레전 평균(평일)": fmt_man(ep_norm["mean_cost"], "메소"),
                         "에픽->레전 평균(✨미라클)": fmt_man(ep_mira["mean_cost"], "메소"),
-                        "에픽->레전 50%중앙값(미라클)": fmt_man(ep_mira["p50_cost"], "메소"),
-                        "에픽->레전 100%천장합계": fmt_man(ep_norm["ceil_cost"], "메소"),
+                        "50%중앙값(미라클)": fmt_man(ep_mira["p50_cost"], "메소"),
+                        "100%천장합계": fmt_man(ep_norm["ceil_cost"], "메소"),
                     })
             st.dataframe(pd.DataFrame(tier_guide_rows), use_container_width=True, hide_index=True)
+
+            st.markdown("##### 📌 3. 2025 개편 넥슨 공식 스타포스 기대 메소 & 평균 파괴 횟수 (0성 출발 / 스타캐치 O / 파방 X / 스페어 제외)")
+            sf_guide_rows = []
+            for lv_sample in [150, 160, 200, 250]:
+                r17 = calc_starforce_expected(lv_sample, 0, 17, 0.0, "✨ 샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 30% 감소)", False, True)
+                r18 = calc_starforce_expected(lv_sample, 0, 18, 0.0, "✨ 샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 30% 감소)", False, True)
+                r21 = calc_starforce_expected(lv_sample, 0, 21, 0.0, "✨ 샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 30% 감소)", False, True)
+                r22 = calc_starforce_expected(lv_sample, 0, 22, 0.0, "✨ 샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 30% 감소)", False, True)
+                sf_guide_rows.append({
+                    "장비 레벨": f"{lv_sample}제",
+                    "17성 (샤타)": f"{fmt_man(r17['meso_cost'], '메소')} (파괴 {r17['booms']:.2f}회)",
+                    "18성 (샤타)": f"{fmt_man(r18['meso_cost'], '메소')} (파괴 {r18['booms']:.2f}회)",
+                    "21성 (샤타)": f"{fmt_man(r21['meso_cost'], '메소')} (파괴 {r21['booms']:.2f}회)",
+                    "22성 (샤타)": f"{fmt_man(r22['meso_cost'], '메소')} (파괴 {r22['booms']:.2f}회)",
+                })
+            st.dataframe(pd.DataFrame(sf_guide_rows), use_container_width=True, hide_index=True)
 # [파트 3 끝]
 # [파트 4 시작]
     # --------------------------------------------------------------------------

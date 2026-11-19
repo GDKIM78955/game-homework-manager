@@ -182,7 +182,7 @@ def load_common_data():
 
 
 # ==============================================================================
-# ⚓ 1. 로스트아크 데이터 및 로직
+# ⚓ 1. 로스트아크 데이터 및 로직 (7~11레벨 보석 개수 필드 추가)
 # ==============================================================================
 def get_loa_day(dt):
     if dt.tzinfo is None:
@@ -229,7 +229,9 @@ def create_initial_loa(now_str):
             "id": idx, "계정명": acc, "서버": srv, "신뢰도": "🟡작업중",
             "생활완료": False, "생활기록시간": "", "생기수치": 10500, "생기상태": "🔥 10,500 (수확 가능)",
             "보석배": False, "보석배시간": "", "낙원": False, "이벤": False, "싱글": False,
-            "카던큐브": "", "보석메모": "",
+            "카던큐브": "",
+            "보석7": 0, "보석8": 0, "보석9": 0, "보석10": 0, "보석11": 0,
+            "보석메모": "",
         }
         for c in range(1, 7):
             row[f"LV{c}"] = ""
@@ -263,6 +265,8 @@ def ensure_loa_schema(data):
         row.setdefault("이벤", False)
         row.setdefault("싱글", False)
         row.setdefault("카던큐브", "")
+        for lv in range(7, 12):
+            row.setdefault(f"보석{lv}", 0)
         row.setdefault("보석메모", "")
         for c in range(1, 7):
             row.setdefault(f"LV{c}", "")
@@ -910,7 +914,7 @@ tab_loa, tab_gersang, tab_maple = st.tabs([
 # [파트 1 끝]
 # [파트 2 시작]
 # ==============================================================================
-# 탭 1: ⚓ 로스트아크 화면 (무삭제 풀버전)
+# 탭 1: ⚓ 로스트아크 화면 (7~11레벨 보석 개수 관리 + 25서버 총합계 바 포함)
 # ==============================================================================
 with tab_loa:
     render_game_timer("loa", "로스트아크", default_min=45)
@@ -946,15 +950,25 @@ with tab_loa:
                 st.toast("✅ 로스트아크 데이터가 깃허브에 영구 저장되었습니다!")
                 st.rerun()
 
-    col_v1, col_v2, col_v3, col_v4 = st.columns([1.2, 1.2, 1.2, 2.4])
+    col_v1, col_v2, col_v3, col_v4, col_v5 = st.columns([1.1, 1.1, 1.1, 1.2, 2.0])
     with col_v1:
-        show_lv = st.checkbox("📊 캐릭터별 템렙 보이기", value=True)
+        show_lv = st.checkbox("📊 캐릭터별 템렙", value=True)
     with col_v2:
-        show_cd = st.checkbox("🌀 카던 휴게 보이기", value=True)
+        show_cd = st.checkbox("🌀 카던 휴게", value=True)
     with col_v3:
-        show_raid = st.checkbox("⚔️ 레이드/계승 보이기", value=True)
+        show_raid = st.checkbox("⚔️ 레이드/계승", value=True)
     with col_v4:
-        group_by_char = st.checkbox("👥 캐릭터별로 묶어서 배열 (1렙-1카-1캐 순서)", value=True)
+        show_gem = st.checkbox("💎 7~11렙 보석", value=True)
+    with col_v5:
+        group_by_char = st.checkbox("👥 캐릭터별로 묶어서 배열 (1렙-1카-1캐)", value=True)
+
+    GEM_COLS = ["보석7", "보석8", "보석9", "보석10", "보석11"]
+
+    # 전체 25서버 7~11레벨 보석 합계 요약 바
+    if show_gem:
+        gem_totals = {lv: sum(int(r.get(f"보석{lv}", 0) or 0) for r in loa_data["rows"]) for lv in range(7, 12)}
+        gem_summary = "  |  ".join([f"**{lv}렙:** `{gem_totals[lv]:,}개`" for lv in range(7, 12)])
+        st.info(f"💎 **전체 25서버 보유 보석 합계** 👉  {gem_summary}")
 
     display_cols = [
         "id", "계정명", "서버", "신뢰도", "생활완료", "생기상태",
@@ -969,12 +983,20 @@ with tab_loa:
         if show_lv: display_cols.extend([f"LV{c}" for c in range(1, 7)])
         if show_cd: display_cols.extend([f"CD{c}" for c in range(1, 7)])
         if show_raid: display_cols.extend([f"C{c}" for c in range(1, 7)])
-    display_cols.extend(["카던큐브", "보석메모"])
+    display_cols.append("카던큐브")
+    if show_gem:
+        display_cols.extend(GEM_COLS)
+    display_cols.append("보석메모")
 
     df = pd.DataFrame(loa_data["rows"])
     for col in display_cols:
         if col not in df.columns:
-            df[col] = False if col in ["생활완료", "보석배", "낙원", "이벤", "싱글"] else ""
+            if col in ["생활완료", "보석배", "낙원", "이벤", "싱글"]:
+                df[col] = False
+            elif col in GEM_COLS:
+                df[col] = 0
+            else:
+                df[col] = ""
 
     if only_todo:
         df = df[(~df["생활완료"]) | (~df["보석배"])]
@@ -1010,6 +1032,11 @@ with tab_loa:
         "이벤": st.column_config.CheckboxColumn("🎁이벤", width="small"),
         "싱글": st.column_config.CheckboxColumn("🪙싱글", width="small"),
         "카던큐브": st.column_config.TextColumn("🎫큐브티켓", width="small"),
+        "보석7": st.column_config.NumberColumn("💎7렙", min_value=0, step=1, format="%d개", width="small"),
+        "보석8": st.column_config.NumberColumn("💎8렙", min_value=0, step=1, format="%d개", width="small"),
+        "보석9": st.column_config.NumberColumn("💎9렙", min_value=0, step=1, format="%d개", width="small"),
+        "보석10": st.column_config.NumberColumn("💎10렙", min_value=0, step=1, format="%d개", width="small"),
+        "보석11": st.column_config.NumberColumn("💎11렙", min_value=0, step=1, format="%d개", width="small"),
         "보석메모": st.column_config.TextColumn("💎보석/수익 메모", width="medium"),
     }
     for c in range(1, 7):
@@ -1042,6 +1069,14 @@ with tab_loa:
                 if orig.get(col, "") != val:
                     orig[col] = val
                     changed = True
+
+        for gcol in GEM_COLS:
+            if gcol in edit_row:
+                gval = 0 if pd.isna(edit_row[gcol]) else max(0, int(edit_row[gcol]))
+                if int(orig.get(gcol, 0) or 0) != gval:
+                    orig[gcol] = gval
+                    changed = True
+                    need_table_refresh = True
 
         for c in range(1, 7):
             col_cd = f"CD{c}"

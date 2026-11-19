@@ -150,11 +150,11 @@ def save_json_github(filename, data, commit_msg):
 # ==============================================================================
 def create_initial_common():
     return {
-        "loa_krw_per_10k_gold": 3500.0,     # 로아 1만 골드당 현금 시세(원)
-        "loa_hourly_gold": 15000.0,         # 로아 생활/카던/보석 1시간 평균 획득 골드
-        "loa_monthly_gold_sold": 0.0,       # 이번 달 로아 보석/골드 판매 누적량(골드)
-        "gs_krw_per_1eok": 1800.0,          # 거상 1억 전(10,000만)당 현금 시세(원)
-        "mp_krw_per_1eok": 2200.0           # 메이플 1억 메소(10,000만)당 현금 시세(원)
+        "loa_krw_per_10k_gold": 3500.0,
+        "loa_hourly_gold": 15000.0,
+        "loa_monthly_gold_sold": 0.0,
+        "gs_krw_per_1eok": 1800.0,
+        "mp_krw_per_1eok": 2200.0
     }
 
 def load_common_data():
@@ -373,7 +373,7 @@ PROFIT_LINK_OPTS = [
 def create_initial_gersang(today_str):
     return {
         "last_daily_date": today_str,
-        "jokbo_shift_pct": 0.0, # 거상 족보 시세 일괄 보정 %
+        "jokbo_shift_pct": 0.0,
         "daily_tasks": {"quest": False, "factory": False, "hunt_goal": False},
         "client2_farm": {
             "current_money": 0.0,
@@ -383,10 +383,7 @@ def create_initial_gersang(today_str):
             "drops_per_hour": 30.0,
             "extra_hourly_man": 500.0,
             "daily_hours": 2.0,
-            "targets": [
-                {"id": 1, "포함": True, "아이템명": "다음 단계 목표템 1 (클릭해 수정)", "목표가": 50000.0, "구매완료": False, "메모": "예: 5억 전"},
-                {"id": 2, "포함": True, "아이템명": "다음 단계 목표템 2 (클릭해 수정)", "목표가": 30000.0, "구매완료": False, "메모": "예: 3억 전"},
-            ]
+            "targets": []
         },
         "client1_trades": []
     }
@@ -444,9 +441,8 @@ def load_gersang_data():
 
 
 # ==============================================================================
-# 🍁 3. 메이플스토리 `mesu.live` 올인원(추옵+주흔작+스타포스+윗잠+아랫잠) 통합 엔진
+# 🍁 3. 메이플스토리 `mesu.live` 올인원 통합 엔진 (17성 파괴 기댓값 보정 반영)
 # ==============================================================================
-# [A] 잠재능력 1회 재설정 정가표 (단위: 만 메소)
 MAPLE_CUBE_COST_TABLE = {
     "윗잠 (잠재능력)": {
         "71~110제 (미카엘라 새안경/하프이어링 등)": {"레어": 320.0, "에픽": 1280.0, "유니크": 3060.0, "레전드리": 3600.0},
@@ -464,7 +460,6 @@ MAPLE_CUBE_COST_TABLE = {
     }
 }
 
-# [B] 등급업 공식 확률(p) + 천장 횟수(pity)
 MAPLE_TIERUP_SPEC = {
     "윗잠 (잠재능력)": {
         "레어->에픽": {"p": 0.150000, "pity": 10},
@@ -478,7 +473,6 @@ MAPLE_TIERUP_SPEC = {
     }
 }
 
-# [C] 윗잠/아랫잠 분리 프리셋 (`mesu.live` 공식 결합 확률 %)
 MAPLE_MAIN_POT_OPTIONS = {
     "[레전드리/장신구] 드랍 or 메획 1줄 이상 (20%+)": {"prob_pct": 15.8200, "tier": "레전드리"},
     "[레전드리/장신구] 드랍+메획 총합 2줄 이상 (드메 2줄 핵심!)": {"prob_pct": 1.3960, "tier": "레전드리"},
@@ -516,8 +510,6 @@ MAPLE_ADI_POT_OPTIONS = {
     "🔗 mesu.live 아랫잠 세부 확률(%) 직접 입력": {"prob_pct": None, "tier": "레전드리"}
 }
 
-# [D] `mesu.live` 추가옵션(환생의 불꽃) 목표 급수별 평균 소모 개수 데이터
-# (1급 = 주스탯1 / 공마1=4급 / 올스탯1%=10급 환산 기준)
 MAPLE_FLAME_PRESETS = {
     "보스 장신구/방어구 (추옵 보정 O)": {
         "100급 이상 (가성비 부캐/드메용)": {"강환불": 8.0, "영환불": 3.5},
@@ -540,14 +532,14 @@ MAPLE_FLAME_PRESETS = {
     }
 }
 
-# [E] `mesu.live` 스타포스 목표 별 개수별 표준 기대 비용 & 평균 파괴 횟수 (마르코프 체인 기준, 단위: 만 메소)
+# mesu.live 마르코프 체인 기준 (15->17성 파괴 확률 2.1% 반영)
 MAPLE_STARFORCE_TABLE = {
     "71~110제 (미카엘라 새안경/하프이어링 등)": {
         "10성 (가성비)": {"cost": 400.0, "booms": 0.0},
         "12성 (부캐/토드)": {"cost": 900.0, "booms": 0.0},
         "15성": {"cost": 3500.0, "booms": 0.0},
-        "17성": {"cost": 7500.0, "booms": 0.0},
-        "18성": {"cost": 16000.0, "booms": 0.15},
+        "17성": {"cost": 7800.0, "booms": 0.06},
+        "18성": {"cost": 16000.0, "booms": 0.16},
         "20성": {"cost": 55000.0, "booms": 0.85},
         "21성": {"cost": 85000.0, "booms": 1.40},
         "22성": {"cost": 165000.0, "booms": 2.90},
@@ -556,7 +548,7 @@ MAPLE_STARFORCE_TABLE = {
         "10성 (가성비)": {"cost": 900.0, "booms": 0.0},
         "12성 (부캐/토드)": {"cost": 2200.0, "booms": 0.0},
         "15성": {"cost": 11500.0, "booms": 0.0},
-        "17성 (국민 가성비)": {"cost": 26000.0, "booms": 0.0},
+        "17성 (국민 가성비)": {"cost": 27000.0, "booms": 0.08},
         "18성 (본캐 가성비)": {"cost": 58000.0, "booms": 0.25},
         "20성": {"cost": 195000.0, "booms": 1.15},
         "21성 (준종결)": {"cost": 295000.0, "booms": 1.85},
@@ -566,7 +558,7 @@ MAPLE_STARFORCE_TABLE = {
         "10성 (가성비)": {"cost": 1300.0, "booms": 0.0},
         "12성 (부캐/토드)": {"cost": 3100.0, "booms": 0.0},
         "15성": {"cost": 16500.0, "booms": 0.0},
-        "17성 (국민 가성비)": {"cost": 37000.0, "booms": 0.0},
+        "17성 (국민 가성비)": {"cost": 38500.0, "booms": 0.08},
         "18성 (본캐 가성비)": {"cost": 82000.0, "booms": 0.25},
         "20성": {"cost": 275000.0, "booms": 1.15},
         "21성 (준종결)": {"cost": 415000.0, "booms": 1.85},
@@ -576,7 +568,7 @@ MAPLE_STARFORCE_TABLE = {
         "10성 (가성비)": {"cost": 2500.0, "booms": 0.0},
         "12성 (부캐/토드)": {"cost": 6000.0, "booms": 0.0},
         "15성": {"cost": 32000.0, "booms": 0.0},
-        "17성 (국민 가성비)": {"cost": 72000.0, "booms": 0.0},
+        "17성 (국민 가성비)": {"cost": 75000.0, "booms": 0.08},
         "18성 (본캐 가성비)": {"cost": 160000.0, "booms": 0.25},
         "20성": {"cost": 540000.0, "booms": 1.15},
         "21성 (준종결)": {"cost": 810000.0, "booms": 1.85},
@@ -586,7 +578,7 @@ MAPLE_STARFORCE_TABLE = {
         "10성 (가성비)": {"cost": 4800.0, "booms": 0.0},
         "12성 (부캐/토드)": {"cost": 11500.0, "booms": 0.0},
         "15성": {"cost": 62000.0, "booms": 0.0},
-        "17성 (국민 가성비)": {"cost": 140000.0, "booms": 0.0},
+        "17성 (국민 가성비)": {"cost": 145000.0, "booms": 0.08},
         "18성 (본캐 가성비)": {"cost": 310000.0, "booms": 0.25},
         "20성": {"cost": 1050000.0, "booms": 1.15},
         "21성 (준종결)": {"cost": 1580000.0, "booms": 1.85},
@@ -622,7 +614,7 @@ def calc_mesu_tierup(cube_type, lv_bracket, start_tier, target_tier, is_miracle=
         unit_c = MAPLE_CUBE_COST_TABLE[cube_type][lv_bracket][cur_t]
 
         exp_t = (1.0 - ((1.0 - p) ** N)) / p if p < 1.0 else 1.0
-        
+
         def quantile_t(q):
             if p >= 1.0:
                 return 1
@@ -645,7 +637,7 @@ def calc_mesu_tierup(cube_type, lv_bracket, start_tier, target_tier, is_miracle=
 def calc_mesu_option_stats(prob_pct, unit_cost):
     p = max(0.000001, min(1.0, prob_pct / 100.0))
     mean_tries = 1.0 / p
-    
+
     def q_tries(q):
         if p >= 1.0:
             return 1
@@ -659,7 +651,6 @@ def calc_mesu_option_stats(prob_pct, unit_cost):
         "t95": t95, "p95_cost": t95 * unit_cost,
     }
 
-# 📜 주문의 흔적(%별) 완작 기댓값 산출 함수 (손재주100 + 길드스킬4% + 피버타임 + 이노센트/순백 복구 반영)
 def calc_scroll_expected_cost(scroll_mode, slots, trace_per_try, trace_price_each, inno_cost, css_cost, is_fever=True):
     trace_try_cost_man = (trace_per_try * trace_price_each) / 10000.0
     if "100%" in scroll_mode:
@@ -668,14 +659,12 @@ def calc_scroll_expected_cost(scroll_mode, slots, trace_per_try, trace_price_eac
         p = 0.99 if is_fever else 0.84
     elif "30%" in scroll_mode:
         p = 0.59 if is_fever else 0.44
-    else: # 15% 작
+    else:
         p = 0.39 if is_fever else 0.29
 
     if p >= 0.99:
-        # 피버 70% 및 100% 작: 사실상 스트레이트 완작
         return round(slots * trace_try_cost_man + 150.0, 1), f"확률 {int(p*100)}% 스트레이트 완작"
 
-    # 15% / 30% 작: 첫 4작에서 최소 기준 성공 시 순백(CSS)으로 밀고, 미달 시 이노센트로 초기화하는 표준 완작 알고리즘
     target_first4 = 2 if p < 0.45 else 3
     prob_pass_first4 = 0.0
     for k in range(target_first4, 5):
@@ -686,10 +675,9 @@ def calc_scroll_expected_cost(scroll_mode, slots, trace_per_try, trace_price_eac
     inno_stage_cost = expected_inno_cycles * (4 * trace_try_cost_man + inno_cost) + (4 * trace_try_cost_man)
 
     rem_slots = max(0, slots - target_first4)
-    # 남은 슬롯 1개 성공당 평균 시도 횟수 = 1/p, 평균 실패 횟수(순백 소모) = (1-p)/p
     rem_tries = rem_slots / p
     rem_fails = rem_slots * ((1.0 - p) / p)
-    finish_stage_cost = (rem_tries * trace_try_cost_man) + (rem_fails * css_cost) + 200.0 # 황망100% 등 기본값 포함
+    finish_stage_cost = (rem_tries * trace_try_cost_man) + (rem_fails * css_cost) + 200.0
 
     total_scroll_man = round(inno_stage_cost + finish_stage_cost, 1)
     desc = f"실질확률 {int(p*100)}% | 평균 이노센트 {expected_inno_cycles:.1f}회 + 순백복구 {rem_fails:.1f}회"
@@ -700,7 +688,7 @@ def create_initial_maple(now_str, today_str):
         "last_weekly_reset": now_str,
         "last_daily_date": today_str,
         "fee_rate": 0.03,
-        "jokbo_shift_pct": 0.0, # 메이플 족보 시세 일괄 보정 %
+        "jokbo_shift_pct": 0.0,
         "accounts": [
             {"id": 1, "명의명": "1번 본계정 (루나 / 유니온 8500 / Lv.285)", "결정석완료": False, "결정석수익": 15000.0, "일일메소완료": False, "전문기술피로도": False, "메모": "본캐 주간보스 1캐릭 몰아주기"},
             {"id": 2, "명의명": "2번 부계정 A (루나 / 유니온 2500 / Lv.284)", "결정석완료": False, "결정석수익": 12000.0, "일일메소완료": False, "전문기술피로도": False, "메모": "부계정 보스 & 피로도"},
@@ -845,7 +833,6 @@ gs_data = ensure_gersang_schema(st.session_state.gersang_data)
 mp_data = ensure_maple_schema(st.session_state.maple_data)
 cm_data = st.session_state.common_data
 
-# 상단 타이틀 & 마스터 백업 버튼
 top_t1, top_t2 = st.columns([3.2, 1.3])
 with top_t1:
     st.title("🎮 3대 게임 숙제 & 올인원 수익 관리 사령탑 Pro")
@@ -865,7 +852,6 @@ with top_t2:
             st.toast("✅ 로아·거상·메이플 모든 데이터가 한 번에 깃허브에 영구 백업되었습니다!")
             st.rerun()
 
-# 💵 3개 게임 현금(원화 ₩) 시급 비교 & 월간 총 부수입 정산 대시보드 (접기/펼치기)
 now_kst_all = datetime.now(KST)
 cur_ym_all = now_kst_all.strftime("%Y-%m")
 
@@ -879,7 +865,7 @@ with st.expander("💵 [통합 수익 사령탑] 3개 게임 실시간 현금 �
         loa_rate = st.number_input("⚓ 로아 1만 골드당 현금 시세(원)", min_value=100.0, value=float(cm_data["loa_krw_per_10k_gold"]), step=100.0, format="%.0f")
         loa_hr_g = st.number_input("⚓ 로아 1시간 평균 획득 골드", min_value=0.0, value=float(cm_data["loa_hourly_gold"]), step=1000.0, format="%.0f")
     with krw_c2:
-         loa_m_sold = st.number_input(f"⚓ 이번 달({cur_ym_all}) 로아 판매 골드 합계", min_value=0.0, value=float(cm_data["loa_monthly_gold_sold"]), step=10000.0, format="%.0f")
+        loa_m_sold = st.number_input(f"⚓ 이번 달({cur_ym_all}) 로아 판매 골드 합계", min_value=0.0, value=float(cm_data["loa_monthly_gold_sold"]), step=10000.0, format="%.0f")
     with krw_c3:
         gs_rate = st.number_input("💰 거상 1억 전(10,000만)당 시세(원)", min_value=100.0, value=float(cm_data["gs_krw_per_1eok"]), step=50.0, format="%.0f")
     with krw_c4:
@@ -894,7 +880,6 @@ with st.expander("💵 [통합 수익 사령탑] 3개 게임 실시간 현금 �
         cm_data["mp_krw_per_1eok"] = mp_rate
         save_json_local(COMMON_FILE, cm_data)
 
-    # 각 게임 시간당 원화(₩) 시급 계산
     loa_hourly_krw = (loa_hr_g / 10000.0) * loa_rate
     gs_c2_cfg = gs_data["client2_farm"]
     gs_hourly_man = (float(gs_c2_cfg["drop_item_price"]) * float(gs_c2_cfg["drops_per_hour"])) + float(gs_c2_cfg["extra_hourly_man"])
@@ -905,7 +890,6 @@ with st.expander("💵 [통합 수익 사령탑] 3개 게임 실시간 현금 �
     mp_hunt_hr_man = float(mp_hc["pure_meso_hr"]) + (float(mp_hc["frag_price"]) * float(mp_hc["frags_per_hr"]) * mp_fee_m) + (float(mp_hc["extra_drops_hr"]) * mp_fee_m) - float(mp_hc["consumable_hr"])
     mp_hourly_krw = (mp_hunt_hr_man / 10000.0) * mp_rate
 
-    # 이번 달 원화(₩) 총수익 합산
     loa_m_krw = (loa_m_sold / 10000.0) * loa_rate
     gs_m_krw = (gs_month_man / 10000.0) * gs_rate
     mp_m_krw = ((mp_month_man + mp_boss_done_man) / 10000.0) * mp_rate
@@ -923,10 +907,8 @@ tab_loa, tab_gersang, tab_maple = st.tabs([
     "💰 천하제일상 거상 (2클라+장사+시세보정)",
     "🍁 메이플스토리 (3명의+올인원종합견적기+메소마켓)"
 ])
-
-# ================= [여기까지가 파트 1입니다. 바로 아래 줄에 파트 2를 이어 붙여주세요!] =================
-# ================= [파트 1 코드 바로 아래 줄에 여기서부터 이어서 붙여넣으세요!] =================
-
+# [파트 1 끝]
+# [파트 2 시작]
 # ==============================================================================
 # 탭 1: ⚓ 로스트아크 화면 (무삭제 풀버전)
 # ==============================================================================
@@ -1220,19 +1202,33 @@ with tab_gersang:
 
             st.divider()
 
-            st.markdown("##### 🎯 2. 다음 단계를 위해 구해야 할 목표 템 목록")
+            # ✨ 업그레이드: 2클라 목표템 자유 추가/수정/삭제 & 즉시 재계산
+            t_head1, t_head2 = st.columns([2.2, 1.0])
+            with t_head1:
+                st.markdown("##### 🎯 2. 다음 단계 목표 템 목록 (자유 추가·수정·삭제)")
+            with t_head2:
+                if st.button("🗑️ 목표 목록 전체 비우기", use_container_width=True, key="gs_clear_targets"):
+                    c2["targets"] = []
+                    save_json_local(GERSANG_FILE, gs_data)
+                    st.session_state.gs_dirty = True
+                    st.session_state.gs_editor_ver += 1
+                    st.rerun()
+
             target_df = pd.DataFrame(c2["targets"])
             if target_df.empty:
-                target_df = pd.DataFrame(columns=["id", "포함", "아이템명", "목표가", "구매완료", "메모"])
+                target_df = pd.DataFrame(columns=["포함", "아이템명", "목표가", "구매완료", "메모", "삭제"])
+            else:
+                target_df["삭제"] = False
 
             edited_targets = st.data_editor(
-                target_df[["포함", "아이템명", "목표가", "구매완료", "메모"]],
+                target_df[["포함", "아이템명", "목표가", "구매완료", "메모", "삭제"]],
                 column_config={
-                    "포함": st.column_config.CheckboxColumn("🎯목표포함", width="small", default=True),
-                    "아이템명": st.column_config.TextColumn("구할 아이템 이름", width="medium", required=True),
-                    "목표가": st.column_config.NumberColumn("예상 가격(만 전)", width="small", min_value=0.0, step=100.0, format="%d만", default=10000.0),
-                    "구매완료": st.column_config.CheckboxColumn("✅구입완료", width="small", default=False),
-                    "메모": st.column_config.TextColumn("메모", width="small", default=""),
+                    "포함": st.column_config.CheckboxColumn("🎯포함", width="small", default=True),
+                    "아이템명": st.column_config.TextColumn("✏️구할 아이템 (아래 빈칸 클릭해 추가)", width="medium"),
+                    "목표가": st.column_config.NumberColumn("✏️예상가(만 전)", width="small", min_value=0.0, step=100.0, format="%d만", default=10000.0),
+                    "구매완료": st.column_config.CheckboxColumn("✅완료", width="small", default=False),
+                    "메모": st.column_config.TextColumn("✏️메모", width="small", default=""),
+                    "삭제": st.column_config.CheckboxColumn("🗑️삭제", width="small", default=False),
                 },
                 num_rows="dynamic",
                 use_container_width=True,
@@ -1241,21 +1237,29 @@ with tab_gersang:
             )
 
             new_targets = []
+            deleted_any = False
             for idx, r in edited_targets.iterrows():
+                if not pd.isna(r.get("삭제")) and bool(r["삭제"]):
+                    deleted_any = True
+                    continue
                 if pd.isna(r["아이템명"]) or str(r["아이템명"]).strip() == "":
                     continue
                 new_targets.append({
-                    "id": idx + 1,
+                    "id": len(new_targets) + 1,
                     "포함": True if pd.isna(r["포함"]) else bool(r["포함"]),
-                    "아이템명": str(r["아이템명"]),
+                    "아이템명": str(r["아이템명"]).strip(),
                     "목표가": 0.0 if pd.isna(r["목표가"]) else float(r["목표가"]),
                     "구매완료": False if pd.isna(r["구매완료"]) else bool(r["구매완료"]),
                     "메모": "" if pd.isna(r["메모"]) else str(r["메모"])
                 })
-            if new_targets != c2["targets"]:
+
+            if new_targets != c2["targets"] or deleted_any:
                 c2["targets"] = new_targets
                 save_json_local(GERSANG_FILE, gs_data)
                 st.session_state.gs_dirty = True
+                if deleted_any:
+                    st.session_state.gs_editor_ver += 1
+                st.rerun()
 
             active_targets = [t for t in c2["targets"] if t["포함"] and not t["구매완료"]]
             total_goal = sum(t["목표가"] for t in active_targets)
@@ -1306,12 +1310,12 @@ with tab_gersang:
                     monthly_map[ym]["총 매출(만)"] += float(t.get("sell_price", 0)) * qty
                     monthly_map[ym]["총 매입원가(만)"] += float(t.get("buy_price", 0)) * qty
                     monthly_map[ym]["순수익(만)"] += float(t.get("net_profit", 0))
-                
+
                 m_rows = sorted(monthly_map.values(), key=lambda x: x["월(YYYY-MM)"], reverse=True)
                 for mr in m_rows:
                     mr["순수익 환산"] = fmt_man(mr["순수익(만)"])
                     mr["수익률"] = f"{(mr['순수익(만)'] / mr['총 매입원가(만)'] * 100):.1f}%" if mr["총 매입원가(만)"] > 0 else "0%"
-                
+
                 with st.expander("🗓️ 월별 장사 수익 달력 상세 보기 (클릭해서 열기/닫기)", expanded=True):
                     st.dataframe(pd.DataFrame(m_rows)[["월(YYYY-MM)", "판매 건수", "순수익 환산", "수익률", "총 매입원가(만)", "총 매출(만)"]], use_container_width=True, hide_index=True)
 
@@ -1457,7 +1461,6 @@ with tab_gersang:
 
             st.divider()
 
-            # ✨ 업그레이드: 족보 시세 변동 보정(%) 슬라이더 & 엑셀(CSV) 다운로드 탑재!
             with st.expander("📖 3. 나의 매입 족보 (시세 변동 `%` 보정 지원) & 과거 영수증 수정/복구/엑셀 다운로드", expanded=False):
                 if not trades:
                     st.caption("아직 등록된 거래 내역이 없습니다.")
@@ -1596,12 +1599,10 @@ with tab_gersang:
                             st.session_state.gs_dirty = True
                             st.session_state.gs_editor_ver += 1
                             st.rerun()
-
-# ================= [여기까지가 파트 2입니다. 바로 아래 줄에 파트 3을 이어 붙여주세요!] =================
-# ================= [파트 2 코드 바로 아래의 '파트 3' 구간만 이 코드로 덮어쓰세요!] =================
-
+# [파트 2 끝]
+# [파트 3 시작]
 # ==============================================================================
-# 탭 3: 🍁 메이플스토리 화면 (해방무기 프리셋 + 직작/장사 백과사전 탭 추가 완결판)
+# 탭 3: 🍁 메이플스토리 화면 (해방무기 프리셋 + 올인원 백과사전 완결판)
 # ==============================================================================
 with tab_maple:
     render_game_timer("maple", "메이플스토리", default_min=30)
@@ -1676,7 +1677,7 @@ with tab_maple:
         "🛠️ 2. 올인원 종합 견적기 (해방무기/방어구/장신구)",
         "💱 3. 메소마켓 (시세 일지 & % 보정 & AI 추천)",
         "📖 4. 메이플 장사 가계부 & 시세 족보",
-        "📘 5. 직작 & 장사 백과사전 (추옵/작/용어 완벽 가이드)"
+        "📘 5. 직작 & 장사 백과사전 (추옵/옵션/작 자동판독기)"
     ])
 
     fee_mult = 1.0 - float(mp_data.get("fee_rate", 0.03))
@@ -1826,13 +1827,13 @@ with tab_maple:
                     )
 
     # --------------------------------------------------------------------------
-    # 🛠️ [서브탭 2] 올인원(추옵+주흔작%+스타포스+윗잠+아랫잠+보정%) 종합 견적 & 매물 판독기 (해방무기 프리셋 포함!)
+    # 🛠️ [서브탭 2] 올인원(추옵+주흔작%+스타포스+윗잠+아랫잠+보정%) 종합 견적 & 매물 판독기
     # --------------------------------------------------------------------------
     with mp_sub2:
         st.markdown("#### 🛠️ 올인원(`노작+가위+추옵+주흔작+스타포스+윗잠+아랫잠+시세보정%`) 완제품 종합 견적 & 경매장 매물 판독기")
         st.caption(
             "**장비 레벨 구간과 목표 옵션만 선택하면 `mesu.live` 공식 확률·1회 비용·주흔 소모량이 100% 자동으로 세팅됩니다!** "
-            "(추옵이나 작 보는 법이 헷갈리시면 오른쪽 끝 **`📘 5. 직작 & 장사 백과사전`** 탭을 참고하세요!)"
+            "(무기 추옵·옵션 우선순위·주문서 작 판별이 헷갈리시면 오른쪽 끝 **`📘 5. 직작 & 장사 백과사전`** 탭을 참고하세요!)"
         )
 
         AUTO_TRACE_SPEC = {
@@ -1918,11 +1919,11 @@ with tab_maple:
                     st.session_state.est_base = 0.0; st.session_state.est_auc = 0.0; st.session_state.est_val_shift = 0.0
                     st.session_state.est_use_scis = False
                     st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 무기 (아케인/해방무기 등)"
-                    st.session_state.est_use_scr = False; st.session_state.est_use_sf = False # 15%완작 + 22성 공짜 지급!
+                    st.session_state.est_use_scr = False; st.session_state.est_use_sf = False
                     st.session_state.est_use_main = True; st.session_state.est_use_adi = True
-                    st.session_state.est_main_start = "유니크" # 해방 시 유니크 시작
+                    st.session_state.est_main_start = "유니크"
                     st.session_state.est_main_opt = "[레전드리/무보엠] 보공/공마 유효 3줄 (방무 제외)"
-                    st.session_state.est_adi_start = "에픽"   # 해방 시 에픽 시작
+                    st.session_state.est_adi_start = "에픽"
                     st.session_state.est_adi_opt = "[아랫잠/무보엠] 에디 공격력/마력 21% 이상 (2줄)"
                     st.rerun()
             with pr6:
@@ -2312,7 +2313,8 @@ with tab_maple:
                         "에픽->레전 100%천장합계": fmt_man(ep_norm["ceil_cost"], "메소"),
                     })
             st.dataframe(pd.DataFrame(tier_guide_rows), use_container_width=True, hide_index=True)
-
+# [파트 3 끝]
+# [파트 4 시작]
     # --------------------------------------------------------------------------
     # 💱 [서브탭 3] 메소마켓 (시세 일지 트래커 + 외부요인 % 일괄 보정 + AI 매수/매도 타이밍 판독기)
     # --------------------------------------------------------------------------
@@ -2432,7 +2434,7 @@ with tab_maple:
         with sub_c1:
             st.markdown("##### 📊 꾸준히 기록한 메소마켓 시세 일지")
             if rate_logs:
-                shift_mult = 1.0 + ( float(mm_cfg.get("shift_pct", 0.0)) / 100.0 )
+                shift_mult = 1.0 + (float(mm_cfg.get("shift_pct", 0.0)) / 100.0)
                 log_rows = []
                 for x in sorted(rate_logs, key=lambda i: i.get("id", 0), reverse=True):
                     r_val = float(x.get("시세(1억당메포)", 2400.0))
@@ -2550,12 +2552,12 @@ with tab_maple:
                 mp_monthly_map[ym]["총 매출(만)"] += float(t.get("sell_price", 0)) * qty
                 mp_monthly_map[ym]["총 매입원가(만)"] += float(t.get("buy_price", 0)) * qty
                 mp_monthly_map[ym]["순수익(만)"] += float(t.get("net_profit", 0))
-            
+
             mp_m_rows = sorted(mp_monthly_map.values(), key=lambda x: x["월(YYYY-MM)"], reverse=True)
             for mr in mp_m_rows:
                 mr["순수익 환산"] = fmt_man(mr["순수익(만)"], "메소")
                 mr["수익률"] = f"{(mr['순수익(만)'] / mr['총 매입원가(만)'] * 100):.1f}%" if mr["총 매입원가(만)"] > 0 else "0%"
-            
+
             with st.expander("🗓️ 메이플 월별 장사 수익 달력 상세 보기", expanded=True):
                 st.dataframe(pd.DataFrame(mp_m_rows)[["월(YYYY-MM)", "판매 건수", "순수익 환산", "수익률", "총 매입원가(만)", "총 매출(만)"]], use_container_width=True, hide_index=True)
 
@@ -2846,17 +2848,17 @@ with tab_maple:
                         st.rerun()
 
     # --------------------------------------------------------------------------
-    # 📘 [서브탭 5] 직작 & 장사 백과사전 (1추/2추, 방어구 급수 계산기, 작 보는 법, 대장장이/합성/토드 완벽 가이드)
+    # 📘 [서브탭 5] 직작 & 장사 백과사전 (무기 추옵 계산기 + 옵션 우선순위 판독기 + 주문서 작 역산 판독기)
     # --------------------------------------------------------------------------
     with mp_sub5:
-        st.markdown("#### 📘 메이플스토리 직작 & 장사 필수 백과사전 (언제든 꺼내 보는 실전 매뉴얼)")
-        st.caption("경매장에서 매물을 보거나 직접 아이템을 제작·합성·강화해서 팔 때 반드시 알아야 할 핵심 개념과 공식을 한눈에 볼 수 있게 정리했습니다.")
+        st.markdown("#### 📘 메이플스토리 직작 & 장사 필수 백과사전 (실시간 자동 판독기 4종 탑재)")
+        st.caption("경매장 매물 감정이나 직작 시 **방어구 추옵 급수 · 무기 1~5추옵 · 무기 옵션 우선순위/환금성 · 주문서 작 종류**를 숫자와 선택만으로 1초 만에 판독할 수 있습니다.")
 
-        # 실시간 방어구/장신구 추옵 급수 암산 도우미 내장!
+        # 1. 방어구/장신구 추옵 급수 계산기
         with st.container(border=True):
-            st.markdown("##### 🧮 1초 만에 계산하는 '방어구/장신구 추옵 급수(OO급)' 계산기 & 보는 법")
+            st.markdown("##### 🧮 1. '방어구/장신구 추옵 급수(OO급)' 계산기")
             st.markdown(
-                "인게임 아이템 툴팁에서 **초록색 숫자(`+OO`)**로 적힌 추가옵션 수치를 아래에 넣으면 몇 급인지 즉시 계산됩니다! "
+                "인게임 아이템 툴팁의 **초록색 숫자(`+OO`)**를 넣으면 몇 급인지 즉시 계산됩니다! "
                 "**(공식: `주스탯 1 = 1급` / `공격력·마력 1 = 4급` / `올스탯 1% = 10급` / `부스탯 10 = 1급`)**"
             )
             fc1, fc2, fc3, fc4, fc5 = st.columns([1, 1, 1, 1, 1.5])
@@ -2873,73 +2875,221 @@ with tab_maple:
                 st.metric("🔥 이 아이템의 추옵 급수", f"{calc_grade:.0f} 급", f"스탯{g_stat} + 공마({g_att}×4) + 올스탯({g_all}%×10)")
 
             grade_table = [
-                {"장비 종류": "👑 보스 방어구/장신구 (데브펜, 트와마, 가엔링, 아케인, 앱솔 등)", "추옵 특징": "보스 추옵 보정 O (최대 4줄 고정, 높은 수치 등장)", "가성비/부캐용": "100급 ~ 110급", "국민 본캐용 (가장 거래 활발)": "120급 ~ 130급", "고스펙/준종결 (비쌈)": "140급 ~ 150급+"},
-                {"장비 종류": "👓 일반 제작/드롭 장비 (미카엘라 새안경, 하프이어링, 마이스터링 등)", "추옵 특징": "보스 추옵 보정 X (1~4줄 랜덤, 낮은 수치 등장)", "가성비/부캐용": "50급 ~ 65급", "국민 본캐/드메용": "75급 ~ 85급 (보장 120급 가치)", "고스펙/준종결 (비쌈)": "95급 ~ 110급+ (극추옵)"},
+                {"장비 종류": "👑 보스 방어구/장신구 (데브펜, 트와마, 가엔링, 아케인, 앱솔 등)", "추옵 특징": "보스 추옵 보정 O (4줄 고정, 높은 수치)", "가성비/부캐용": "100급 ~ 110급", "국민 본캐용 (거래 활발)": "120급 ~ 130급", "고스펙/준종결": "140급 ~ 150급+"},
+                {"장비 종류": "👓 일반 제작/드롭 장비 (미카엘라 새안경, 하프이어링, 마이스터링 등)", "추옵 특징": "보스 추옵 보정 X (1~4줄 랜덤)", "가성비/부캐용": "50급 ~ 65급", "국민 본캐/드메용": "75급 ~ 85급", "고스펙/준종결": "95급 ~ 110급+"},
             ]
             st.dataframe(pd.DataFrame(grade_table), use_container_width=True, hide_index=True)
 
         g_col1, g_col2 = st.columns(2, gap="large")
 
+        # 왼쪽 컬럼: 2. 무기 1~5추옵 자동 판독기 + 3. 무기 옵션 우선순위 & 시장 가치 판독기
         with g_col1:
             with st.container(border=True):
-                st.markdown("##### ⚔️ 2. 무기 '1추옵 / 2추옵' 완벽 이해하기")
-                st.markdown(
-                    """
-                    무기는 방어구처럼 'OO급'으로 부르지 않고 **초록색 공격력/마력이 몇 단계로 붙었는가(`1추옵 ~ 5추옵`)**로 부릅니다.
-                    * **1추옵 (5단계 최고 수치):** 해당 무기에 붙을 수 있는 가장 높은 추가 공격력/마력입니다.
-                    * **2추옵 (4단계 차상위 수치):** 1추옵 바로 아래 단계의 추가 공격력/마력입니다.
-                    * **💡 무기 추옵 장사/직작 핵심 기준:**
-                      1. **해방 전 임시 무기 (17~18성 아케인):** **`2추옵 + 보공`** 또는 **`1추옵 단독`**이면 충분합니다. (절대 영환불/검환불을 많이 쓰지 마세요!)
-                      2. **제네시스 해방 무기 (최종 무기):** 해방 무기는 평생 쓰는 무기이므로 **`1추옵 + 보공 + 데미지/올스탯/주스탯`** 또는 최소 **`2추옵 + 보공 10~12% + 데미지/주스탯`**을 목표로 돌립니다.
-                    """
-                )
-                wp_table = [
-                    {"무기 등급": "200제 제네시스 무기 (해방)", "추옵 특징": "보스 추옵 보정 O", "1추옵 비율": "무기 기본 공/마의 약 44%~51%", "국민 목표 옵션": "1추옵 + 보공 (또는 2추+보공+뎀)"},
-                    {"무기 등급": "200제 아케인셰이드 무기", "추옵 특징": "보스 추옵 보정 O", "1추옵 비율": "무기 기본 공/마의 약 44%~51%", "국민 목표 옵션": "해방 전 임시용: 1추 단독 or 2추+보공"},
-                    {"무기 등급": "160제 앱솔랩스 무기", "추옵 특징": "보스 추옵 보정 O", "1추옵 비율": "무기 기본 공/마의 약 36%~42%", "국민 목표 옵션": "부캐 주보돌이용: 1~2추옵 아무거나"},
-                ]
-                st.dataframe(pd.DataFrame(wp_table), use_container_width=True, hide_index=True)
+                st.markdown("##### ⚔️ 2. 무기 '1추옵 ~ 5추옵' 실시간 자동 판독기")
+                st.caption("무기 등급과 직업군(또는 흰색 기본 공/마)을 고르고 경매장 매물의 **초록색 공/마(+)**를 넣으면 몇 추옵인지 즉시 판독합니다!")
+
+                WEAPON_BASE_ATT = {
+                    "아케인셰이드 / 제네시스 (200제)": {
+                        "스태프 (법사)": 353, "완드 (법사)": 318, "샤이닝로드 (루미)": 318, "ESP리미터 (키네)": 318,
+                        "매직건틀렛 (일리움)": 318, "부채 (호영)": 318, "두손검/두손도끼/두손둔기": 295,
+                        "창 / 폴암": 295, "건틀렛 리볼버 (블래)": 295, "데스페라도 (데벤)": 295,
+                        "튜너 (아델)": 295, "무권 (아크)": 295, "한손검/한손도끼/한손둔기": 283,
+                        "활 (보마)": 276, "석궁 (신궁)": 276, "에인션트 보우 (패파)": 276, "듀얼보우건 (메르)": 276,
+                        "브레스 슈터 (카인)": 276, "케인 (팬텀)": 276, "체인 (카데나)": 276, "단검 (섀도어)": 276,
+                        "블레이드 (듀블 보조)": 140, "건 (캡틴)": 221, "너클 (바이퍼/은월/스커)": 221,
+                        "에너지소드 (제논)": 221, "소울슈터 (엔버)": 221, "아대 (나로)": 149,
+                        "✏️ 직접 기본 공/마 입력": 295
+                    },
+                    "앱솔랩스 (160제)": {
+                        "스태프 (법사)": 241, "완드 (법사)": 218, "두손검/두손도끼/두손둔기": 205,
+                        "창 / 폴암": 205, "한손검/한손도끼/한손둔기": 197, "활/석궁/케인/체인/단검": 192,
+                        "건 / 너클 / 소울슈터": 154, "아대 (나로)": 103,
+                        "✏️ 직접 기본 공/마 입력": 205
+                    },
+                    "파프니르 (150제)": {
+                        "스태프 (법사)": 204, "완드 (법사)": 185, "두손검/두손도끼/두손둔기": 171,
+                        "창 / 폴암": 171, "한손검/한손도끼/한손둔기": 164, "활/석궁/케인/체인/단검": 160,
+                        "건 / 너클 / 소울슈터": 128, "아대 (나로)": 86,
+                        "✏️ 직접 기본 공/마 입력": 171
+                    }
+                }
+
+                FLAME_TIER_COEFF = {
+                    "아케인셰이드 / 제네시스 (200제)": [0.4408, 0.3206, 0.2204, 0.1403, 0.0802],
+                    "앱솔랩스 (160제)": [0.3630, 0.2640, 0.1815, 0.1155, 0.0660],
+                    "파프니르 (150제)": [0.3630, 0.2640, 0.1815, 0.1155, 0.0660],
+                }
+
+                wc1, wc2 = st.columns(2)
+                with wc1:
+                    wp_grade = st.selectbox("1. 무기 등급(레벨)", list(WEAPON_BASE_ATT.keys()), key="wp_calc_grade")
+                with wc2:
+                    wp_job = st.selectbox("2. 직업 / 무기 종류", list(WEAPON_BASE_ATT[wp_grade].keys()), key="wp_calc_job")
+
+                wc3, wc4 = st.columns(2)
+                with wc3:
+                    default_b_att = WEAPON_BASE_ATT[wp_grade][wp_job]
+                    base_att_in = st.number_input("3. 무기 흰색 기본 공/마", min_value=50, max_value=600, value=int(default_b_att), step=1, key=f"wp_batt_{wp_grade}_{wp_job}")
+                with wc4:
+                    coeffs = FLAME_TIER_COEFF[wp_grade]
+                    t1 = math.ceil(base_att_in * coeffs[0])
+                    t2 = math.ceil(base_att_in * coeffs[1])
+                    t3 = math.ceil(base_att_in * coeffs[2])
+                    t4 = math.ceil(base_att_in * coeffs[3])
+                    t5 = math.ceil(base_att_in * coeffs[4])
+                    green_att_in = st.number_input("4. 매물의 초록색 공/마 (+)", min_value=0, max_value=300, value=int(t1), step=1, key="wp_gatt")
+
+                if green_att_in >= t1:
+                    wp_verdict = f"👑 1추옵 (최고 등급! 기준 +{t1} 이상)"
+                elif green_att_in >= t2:
+                    wp_verdict = f"🔥 2추옵 (실전 합격! 기준 +{t2} 이상)"
+                elif green_att_in >= t3:
+                    wp_verdict = f"🟡 3추옵 (가성비/환불 권장, 기준 +{t3})"
+                elif green_att_in >= t4:
+                    wp_verdict = f"⚪ 4추옵 (미달, 기준 +{t4})"
+                elif green_att_in >= t5:
+                    wp_verdict = f"⚪ 5추옵 (최하급, 기준 +{t5})"
+                else:
+                    wp_verdict = "❌ 공/마 추옵 없음 (환불 필수)"
+
+                st.success(f"**판독:** **`{wp_verdict}`**\n\n이 무기의 공식 기준표: **1추 `+{t1}`** | **2추 `+{t2}`** | **3추 `+{t3}`** | 4추 `+{t4}` | 5추 `+{t5}`")
 
             with st.container(border=True):
-                st.markdown("##### 🔨 3. 대장장이(장비/장신구 제작) & 합성 & 토드의 망치 장사 가이드")
-                st.markdown(
-                    """
-                    * **💍 장신구/장비 제작 & 합성 장사 원리:**
-                      1. 마이스터빌에서 피로도를 써서 **미카엘라의 새 안경(90제), 하프 이어링(75제), 골든 클로버 벨트, 데아 시두스 이어링** 등을 대량 제작하거나 경매장에서 싼 노작을 매입합니다.
-                      2. **장비 합성(연금술):** 노작 2개를 합성하면 확률적으로 **에픽 잠재능력**이나 **고추옵(80~100급)**이 뜹니다.
-                      3. **미라클 데이 활용:** 합성이나 제작으로 만든 템을 미라클 데이에 **레전드리 등업 $\\rightarrow$ 아획/메획(드메) 1~2줄**을 띄워 팔면 노작 대비 수십억 메소의 마진이 남습니다.
-                    * **🔨 토드의 망치 (에픽 2줄 장사) 원리:**
-                      1. 큐브 감정비가 거의 안 드는 **저레벨 장비(80~120제)**에서 수상한 큐브로 **`에픽 주스탯 9%~12%(2줄)`** 및 **`에디셔널 공/마 +10`**을 싸게 띄웁니다.
-                      2. `토드의 망치`로 10레벨 단위씩 상위 장비로 전승시켜 **160제(앱솔랩스/데브펜/트와마) 또는 200제**에 옮겨 담아 경매장에 팔면, 직접 고레벨 템에 큐브를 돌리는 것보다 원가가 절반 이하로 줄어듭니다!
-                    """
-                )
+                st.markdown("##### 🎯 3. 무기(무보엠) 옵션 우선순위 & 경매장 시장 가치 판독기")
+                st.caption("사용 목적과 현재 뜬 잠재 3줄을 고르면 **실전 효율과 경매장 환금성(잘 팔리는지 여부)**을 판독해 드립니다.")
 
+                op_c1, op_c2 = st.columns([1.2, 1.8])
+                with op_c1:
+                    wp_purpose = st.radio("사용 목적", ["🐉 보스/해방용", "⚔️ 사냥(재획)용", "💰 경매장 장사용"], key="wp_purp")
+                with op_c2:
+                    POT_LINE_OPTS = ["공격력/마력 %", "보스 공격력 %", "방어율 무시 %", "주스탯% / 잡옵"]
+                    l1 = st.selectbox("1번째 줄", POT_LINE_OPTS, index=0, key="wp_l1")
+                    l2 = st.selectbox("2번째 줄", POT_LINE_OPTS, index=1, key="wp_l2")
+                    l3 = st.selectbox("3번째 줄", POT_LINE_OPTS, index=0, key="wp_l3")
+
+                lines = [l1, l2, l3]
+                n_att = lines.count("공격력/마력 %")
+                n_boss = lines.count("보스 공격력 %")
+                n_ied = lines.count("방어율 무시 %")
+                n_valid_boss = n_att + n_boss
+
+                if wp_purpose == "⚔️ 사냥(재획)용":
+                    if n_att == 3:
+                        st.success("👑 **[사냥 종결 3줄]** 공/마% 3줄! 사냥·보스 모두 최상급이며 경매장에서도 초고가에 즉시 팔립니다.")
+                    elif n_att == 2:
+                        st.info("🔥 **[사냥 실전 2줄]** 재획 원킬 컷에 아주 우수합니다. (보공/방무는 일반 몬스터에게 적용되지 않습니다.)")
+                    else:
+                        st.warning(f"🟡 **[사냥용 비추천]** 사냥에는 오직 **공/마%**만 적용됩니다. 현재 유효 {n_att}줄입니다.")
+                elif wp_purpose == "💰 경매장 장사용":
+                    if n_valid_boss == 3:
+                        st.success("💎 **[S급 황금 매물 - 최고 환금성]** 방무가 섞이지 않은 순수 `공/마% + 보공%` 3줄! 감가 없이 제값에 가장 빨리 팔립니다.")
+                    elif n_valid_boss == 2 and n_ied == 1:
+                        st.info("🟡 **[A급 실전 3줄 - 방무 감가 존재]** 실전 성능은 좋지만 경매장에서는 순수 보공/공마 3줄보다 시세가 낮게 형성됩니다. 적정가에 빠르게 처분하세요.")
+                    elif n_valid_boss == 2:
+                        st.info("🟢 **[B급 국민 2줄]** 해방 전 거쳐가는 아케인 무기나 부캐용으로 거래량이 꾸준한 국민 매물입니다.")
+                    else:
+                        st.error("🔴 **[장사 비추천 / 꽝 매물]** 방무 2줄 이상이거나 잡옵이 많아 경매장에서 잘 팔리지 않습니다. 큐브를 더 돌리세요.")
+                else:
+                    if n_valid_boss == 3:
+                        st.success("👑 **[보스 종결 3줄 (보보공/보공공/공공공)]** 제네시스 해방 무기 기준 평생 쓰는 졸업 옵션입니다!")
+                    elif n_valid_boss == 2 and n_ied == 1:
+                        st.success("🔥 **[보스 실전 3줄 (방무 1줄 포함)]** 방무가 부족한 구간에서는 체감 딜이 엄청나게 좋습니다. 본캐 실사용으로 강력 추천!")
+                    elif n_valid_boss == 2:
+                        st.info("🟢 **[해방 전 합격 2줄]** 해방 전 아케인 무기나 주보돌이용으로 충분한 가성비 옵션입니다.")
+                    else:
+                        st.warning("🟡 **[스펙업 필요]** 보스용 무기는 최소 `공/마% + 보공%` 2줄 이상을 맞추는 것이 정석입니다.")
+
+                prio_df = pd.DataFrame([
+                    {"순위": "1순위", "옵션": "공격력 / 마력 %", "보스": "★★★★★", "사냥": "★★★★★", "경매장 환금성": "👑 최고가 (무조건 1티어)"},
+                    {"순위": "2순위", "옵션": "보스 공격력 %", "보스": "★★★★★", "사냥": "❌ 미적용", "경매장 환금성": "🔥 최상 (공%와 조합 시 종결)"},
+                    {"순위": "3순위", "옵션": "방어율 무시 %", "보스": "★★★☆☆", "사냥": "❌ 미적용", "경매장 환금성": "🟡 감가 발생 (1줄까지만 유효)"},
+                    {"순위": "4순위", "옵션": "주스탯 %", "보스": "❌ 잡옵", "사냥": "❌ 잡옵", "경매장 환금성": "🔴 무가치 (방어구/장신구 전용)"},
+                ])
+                st.dataframe(prio_df, use_container_width=True, hide_index=True)
+
+        # 오른쪽 컬럼: 4. 주문서 작 역산 판독기 + 5. 대장장이/합성/토드 & 은어 사전
         with g_col2:
             with st.container(border=True):
-                st.markdown("##### 📜 4. 경매장 완제품 '작(주문서 강화) 상태' 구별하는 법")
-                st.markdown(
-                    """
-                    아이템 툴팁에서 **`파란색 글씨(+OO)`로 오른 총 수치**에서 **`초록색 추옵(+OO)`과 `스타포스 상승분`을 뺀 수치**(또는 메수라이브/인게임 상세 툴팁의 주문서 상승치)를 보면 무슨 작이 발렸는지 바로 알 수 있습니다!
-                    """
+                st.markdown("##### 📜 4. 경매장 완제품 '주문서 작' 실시간 역산 판독기")
+                st.caption(
+                    "아이템 툴팁의 **순수 주문서 상승치(`파란색 총합 - 초록색 추옵 - 스타포스 상승분`)**와 **강화(작) 횟수**를 넣으면 무슨 작인지 판독합니다!"
                 )
+
+                sr_c1, sr_c2 = st.columns(2)
+                with sr_c1:
+                    sr_part = st.selectbox("1. 장비 부위", ["⚔️ 무기 (150~200제)", "🛡️ 방어구 (120제 이상)", "🧤 장갑", "💍 장신구 (반지/펜던트/귀고리 등)"], key="sr_part")
+                    sr_cnt = st.number_input("2. 주문서 성공(작) 횟수 (예: +8, +10)", min_value=1, max_value=15, value=9, step=1, key="sr_cnt")
+                with sr_c2:
+                    sr_att = st.number_input("3. 순수 주문서 상승 공/마 (+)", min_value=0, max_value=200, value=81, step=1, key="sr_att")
+                    sr_stat = st.number_input("4. 순수 주문서 상승 주스탯 (+)", min_value=0, max_value=200, value=36, step=1, key="sr_stat")
+
+                per_att = sr_att / sr_cnt
+                per_stat = sr_stat / sr_cnt
+
+                if "무기" in sr_part:
+                    if per_att >= 9.5:
+                        sr_res = f"👑 매지컬 / 프악공 등 초고자본 특수작! (1작당 공/마 +{per_att:.1f})"
+                    elif 8.5 <= per_att < 9.5:
+                        sr_res = f"🔥 주흔 15% 완작! (1작당 공/마 +{per_att:.1f}, 주스탯 +{per_stat:.1f} - 본캐/해방 정석)"
+                    elif 6.5 <= per_att < 8.5:
+                        sr_res = f"🟢 주흔 30% 완작 (1작당 공/마 +{per_att:.1f}, 주스탯 +{per_stat:.1f})"
+                    elif 4.5 <= per_att < 6.5:
+                        sr_res = f"🟡 주흔 70% 완작 (1작당 공/마 +{per_att:.1f} - 부캐/가성비)"
+                    else:
+                        sr_res = f"⚪ 주흔 100% 작 또는 잡작 (1작당 공/마 +{per_att:.1f})"
+                elif "방어구" in sr_part:
+                    if per_att >= 2.5:
+                        sr_res = f"👑 놀긍혼 / 프방공 등 고자본 공마작! (1작당 공/마 +{per_att:.1f}, 주스탯 +{per_stat:.1f})"
+                    elif per_stat >= 9.5:
+                        sr_res = f"👑 주흔 15% 완작! (1작당 주스탯 +{per_stat:.1f} - 22성 종결급)"
+                    elif 6.5 <= per_stat < 9.5:
+                        sr_res = f"🔥 주흔 30% 완작! (1작당 주스탯 +{per_stat:.1f} - 본캐 17~22성 국민 정석)"
+                    elif 3.5 <= per_stat < 6.5:
+                        sr_res = f"🟡 주흔 70% 완작 (1작당 주스탯 +{per_stat:.1f} - 부캐/토드/가성비)"
+                    else:
+                        sr_res = f"⚪ 주흔 100% 작 또는 미완작 (1작당 주스탯 +{per_stat:.1f})"
+                elif "장갑" in sr_part:
+                    if per_att >= 3.8:
+                        sr_res = f"👑 주흔 15% 완작 또는 프방공! (1작당 공/마 +{per_att:.1f})"
+                    elif 2.8 <= per_att < 3.8:
+                        sr_res = f"🔥 주흔 30% 완작! (1작당 공/마 +{per_att:.1f} - 본캐 국민 정석)"
+                    elif 1.8 <= per_att < 2.8:
+                        sr_res = f"🟡 주흔 70% 완작 (1작당 공/마 +{per_att:.1f} - 가성비)"
+                    else:
+                        sr_res = f"⚪ 주흔 100% 작 또는 잡작 (1작당 공/마 +{per_att:.1f})"
+                else:
+                    if per_att >= 3.8 and per_stat == 0:
+                        sr_res = f"👑 프악공 / 프악마 완작! (1작당 공/마 +{per_att:.1f} 확정 상승 - 종결급)"
+                    elif per_att >= 2.0:
+                        sr_res = f"🔥 놀긍혼(긍정의 혼돈) 작! (1작당 공/마 +{per_att:.1f}, 주스탯 +{per_stat:.1f} / 공+4↑ 상급)"
+                    elif per_stat >= 4.0:
+                        sr_res = f"🟢 주흔 30% 완작 (1작당 주스탯 +{per_stat:.1f})"
+                    else:
+                        sr_res = f"🟡 주흔 70% / 100% 작 (1작당 주스탯 +{per_stat:.1f} - 드메템/가성비)"
+
+                st.info(f"**판독 결과:** **`{sr_res}`**")
+
                 scr_table = [
-                    {"부위 및 작 이름": "⚔️ 무기: 주흔 15% 완작", "1작당 상승 수치": "공/마 +9, 주스탯 +4", "주요 사용처": "본캐 아케인 무기, 제네시스 해방 무기(기본 지급)"},
-                    {"부위 및 작 이름": "🛡️ 방어구: 주흔 30% 완작", "1작당 상승 수치": "주스탯 +7 (120제+), 4번째 성공 시 공/마+1", "주요 사용처": "본캐 17~22성 앱솔/아케인/에테르넬 방어구 정석"},
-                    {"부위 및 작 이름": "🛡️ 방어구/장신구: 주흔 70% 완작", "1작당 상승 수치": "주스탯 +4 (방어구) / +2~3 (장신구)", "주요 사용처": "가성비 부캐, 드메템(미카엘라 등), 토드용 베이스"},
-                    {"부위 및 작 이름": "🧤 장갑: 주흔 15% / 30% 완작", "1작당 상승 수치": "공/마 +4 (15%작) / 공/마 +3 (30%작)", "주요 사용처": "장갑은 스탯이 아니라 무조건 공격력/마력 작!"},
-                    {"부위 및 작 이름": "💍 장신구: 놀긍혼 (긍정의 혼돈)", "1작당 상승 수치": "공/마 0~+6 랜덤 (평균 공/마 +3 이상이면 상급)", "주요 사용처": "18~22성 여명/칠흑 장신구 가성비 고스펙 작"},
-                    {"부위 및 작 이름": "👑 장신구: 프악공 / 프악마", "1작당 상승 수치": "1장당 공/마 +4~5 확정 상승", "주요 사용처": "22성 칠흑 등 초고자본 종결 장신구 (작값만 수십억)"},
+                    {"부위 및 작 이름": "⚔️ 무기: 주흔 15% / 30% / 70%", "1작당 상승 수치": "공+9·스탯+4 / 공+7·스탯+3 / 공+5·스탯+2"},
+                    {"부위 및 작 이름": "🛡️ 방어구: 주흔 15% / 30% / 70%", "1작당 상승 수치": "스탯 +10 / +7 / +4 (4작째 공/마+1)"},
+                    {"부위 및 작 이름": "🧤 장갑: 주흔 15% / 30% / 70%", "1작당 상승 수치": "공/마 +4 / +3 / +2 (스탯 안 오름)"},
+                    {"부위 및 작 이름": "💍 장신구: 놀긍혼 / 프악공", "1작당 상승 수치": "놀긍(공+3~5 랜덤) / 프악공(공+4~5 확정)"},
                 ]
                 st.dataframe(pd.DataFrame(scr_table), use_container_width=True, hide_index=True)
 
             with st.container(border=True):
-                st.markdown("##### 📖 5. 메이플 장사꾼 필수 은어 & 줄임말 사전")
+                st.markdown("##### 🔨 5. 대장장이·합성·토드 가이드 & 장사꾼 필수 은어 사전")
+                st.markdown(
+                    """
+- **💍 제작 & 합성 장사:** 미카엘라 안경(90제)·하프 이어링(75제) 등을 제작·합성해 에픽/고추옵을 띄우고, **미라클 데이에 레전드리 드메(아획/메획) 1~2줄**을 만들어 팔면 고마진 확보 가능!
+- **🔨 토드의 망치 장사:** 감정비가 싼 80~120제에서 `에픽 주스탯 9~12% + 에디 공+10`을 띄워 10레벨 단위로 160~200제에 전승 판매.
+                    """
+                )
                 term_table = [
-                    {"용어": "드메템 (아획/메획)", "뜻과 장사 포인트": "아이템 드롭률 +20% / 메소 획득량 +20% 잠재가 붙은 장신구(반지4, 펜던트2, 얼굴, 눈, 귀고리 총 9부위). 사냥 필수품이라 거래량이 가장 많고 환금성이 최고인 장사 종목!"},
-                    {"용어": "무보엠", "뜻과 장사 포인트": "무기 + 보조무기 + 엠블렘 3부위. 스탯% 대신 '보스 공격력(보공)%', '공격력/마력(공마)%', '방어율 무시(방무)%'가 뜨는 가장 중요한 딜 상승 부위."},
-                    {"용어": "정옵 / 이탈옵", "뜻과 장사 포인트": "정옵(예: 레전 12%+9%+9%=30%), 이탈옵(두 번째·세 번째 줄에서도 첫 줄 최고 수치인 12%가 뜬 12%+12%+9%=33% 같은 고가 매물)."},
-                    {"용어": "크뎀 장갑 (1줄/2줄)", "뜻과 장사 포인트": "장갑 레전드리에서만 뜨는 '크리티컬 데미지 +8%'. 크뎀 1줄은 주스탯 약 24~27%급 효율, 크뎀 2줄(16%)은 종결급으로 고가에 거래됨."},
-                    {"용어": "쿨감뚝 (-2초/-3초/-4초)", "뜻과 장사 포인트": "모자 레전드리에서만 뜨는 '모든 스킬의 재사용 대기시간 -2초'. 특정 직업들의 필수 부위라 미라클 데이에 쿨감 3초~4초가 뜨면 대박 마진 가능."},
-                    {"용어": "노작 / 스페어", "뜻과 장사 포인트": "아무 강화도 안 된 순수 원본 아이템. 스타포스 18~22성 도전 중 장비가 파괴(펑)되었을 때 전승 복구용으로 똑같은 노작 장비(스페어) 1개가 소모됨."},
+                    {"용어": "드메템 (아획/메획)", "뜻과 장사 포인트": "드롭률/메획 +20% 잠재 장신구. 거래량과 환금성이 가장 좋은 1티어 장사 종목."},
+                    {"용어": "정옵 / 이탈옵", "뜻과 장사 포인트": "정옵(12+9+9=30%), 이탈옵(둘째·셋째 줄에 첫 줄 최고치 12%가 뜬 33% 고가 매물)."},
+                    {"용어": "크뎀 장갑 / 쿨감뚝", "뜻과 장사 포인트": "장갑 크뎀 8%(1줄=주스탯 24~27%급), 모자 쿨감 -2~4초(미라클 데이 대박 종목)."},
+                    {"용어": "노작 / 스페어", "뜻과 장사 포인트": "강화 안 된 원본 장비. 18~22성 스타포스 파괴 시 전승 복구용으로 똑같은 노작 1개 소모."},
                 ]
                 st.dataframe(pd.DataFrame(term_table), use_container_width=True, hide_index=True)
+# [파트 4 끝]

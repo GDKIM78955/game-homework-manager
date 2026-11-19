@@ -445,7 +445,7 @@ def load_gersang_data():
 
 
 # ==============================================================================
-# 🍁 3. 메이플스토리 2026 넥슨 공식 확률·비용 통합 엔진 (잠재 4구간 + 2025개편 스타포스 수식)
+# 🍁 3. 메이플스토리 2026 넥슨 공식 확률·비용 통합 엔진 (순수 등업 전용 옵션 포함)
 # ==============================================================================
 # [A] 넥슨 공식 잠재능력 1회 재설정 비용 정가표 (4구간 통일, 단위: 만 메소)
 MAPLE_CUBE_COST_TABLE = {
@@ -463,7 +463,6 @@ MAPLE_CUBE_COST_TABLE = {
     }
 }
 
-# 레벨 구간별 대표 스타포스 장비 레벨 기본값
 BRACKET_DEFAULT_LV = {
     "1~159제 (미카엘라/이벤링/보장/루타비스)": 150,
     "160~199제 (여명/앱솔랩스)": 160,
@@ -486,9 +485,13 @@ MAPLE_TIERUP_SPEC = {
 }
 
 MAPLE_EQUIP_PARTS = ["장신구 (반지/펜던트/귀고리/얼장/눈장)", "방어구 (상의/하의/신발/망토/어깨)", "장갑", "모자", "무보엠 (무기/보조/엠블렘)"]
+ALL_PARTS = ["장신구", "방어구", "장갑", "모자", "무보엠"]
 
-# [C] 부위 필터 지원 윗잠/아랫잠 공식 확률 프리셋
+# [C] 부위 필터 지원 윗잠/아랫잠 공식 확률 프리셋 (상단: 순수 등업 전용 항목 추가)
 MAPLE_MAIN_POT_OPTIONS = {
+    "⭐ [등업만] 레전드리 등급 달성 (옵션 무관 · 순수 등업비)": {"prob_pct": 0.0, "tier": "레전드리", "parts": ALL_PARTS, "tierup_only": True},
+    "⭐ [등업만] 유니크 등급 달성 (옵션 무관 · 순수 등업비)": {"prob_pct": 0.0, "tier": "유니크", "parts": ALL_PARTS, "tierup_only": True},
+    "⭐ [등업만] 에픽 등급 달성 (옵션 무관 · 순수 등업비)": {"prob_pct": 0.0, "tier": "에픽", "parts": ALL_PARTS, "tierup_only": True},
     "[레전드리/장신구] 드랍 or 메획 1줄 이상 (20%+)": {"prob_pct": 15.8200, "tier": "레전드리", "parts": ["장신구"]},
     "[레전드리/장신구] 드랍+메획 총합 2줄 이상 (드메 2줄 핵심!)": {"prob_pct": 1.3960, "tier": "레전드리", "parts": ["장신구"]},
     "[레전드리/장신구] 드랍 or 메획 1줄 + 주스탯 2줄": {"prob_pct": 1.1200, "tier": "레전드리", "parts": ["장신구"]},
@@ -511,10 +514,13 @@ MAPLE_MAIN_POT_OPTIONS = {
     "[유니크] 주스탯 15% ~ 18% (유니크 2줄)": {"prob_pct": 6.6700, "tier": "유니크", "parts": ["장신구", "방어구", "장갑", "모자"]},
     "[에픽] 주스탯 9% ~ 12% (에픽 2줄 토드용)": {"prob_pct": 10.2000, "tier": "에픽", "parts": ["장신구", "방어구", "장갑", "모자"]},
     "[에픽/무보엠] 공격력/마력 9% ~ 12% (에픽 2줄)": {"prob_pct": 6.8000, "tier": "에픽", "parts": ["무보엠"]},
-    "🔗 mesu.live 세부 확률(%) 직접 입력": {"prob_pct": None, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자", "무보엠"]}
+    "🔗 mesu.live 세부 확률(%) 직접 입력": {"prob_pct": None, "tier": "레전드리", "parts": ALL_PARTS}
 }
 
 MAPLE_ADI_POT_OPTIONS = {
+    "⭐ [등업만] 에디 레전드리 등급 달성 (옵션 무관 · 순수 등업비)": {"prob_pct": 0.0, "tier": "레전드리", "parts": ALL_PARTS, "tierup_only": True},
+    "⭐ [등업만] 에디 유니크 등급 달성 (옵션 무관 · 순수 등업비)": {"prob_pct": 0.0, "tier": "유니크", "parts": ALL_PARTS, "tierup_only": True},
+    "⭐ [등업만] 에디 에픽 등급 달성 (옵션 무관 · 순수 등업비)": {"prob_pct": 0.0, "tier": "에픽", "parts": ALL_PARTS, "tierup_only": True},
     "[아랫잠/레어] 공/마 +10 (에디 레어 1줄 가성비)": {"prob_pct": 6.2500, "tier": "레어", "parts": ["장신구", "방어구", "장갑", "모자"]},
     "[아랫잠/에픽] 공/마 +10 또는 주스탯 4%+ (에디 에픽 1.5~2줄)": {"prob_pct": 5.5500, "tier": "에픽", "parts": ["장신구", "방어구", "장갑", "모자"]},
     "[아랫잠/에픽] 공/마 +21 또는 주스탯 8%+ (에디 에픽 2줄 정옵)": {"prob_pct": 0.9200, "tier": "에픽", "parts": ["장신구", "방어구", "장갑", "모자"]},
@@ -524,7 +530,7 @@ MAPLE_ADI_POT_OPTIONS = {
     "[아랫잠/무보엠] 에디 공/마 6% ~ 9% (에픽 1.5~2줄)": {"prob_pct": 4.8000, "tier": "에픽", "parts": ["무보엠"]},
     "[아랫잠/무보엠] 에디 공격력/마력 12%~15% (유니크/레전 1줄+)": {"prob_pct": 6.8000, "tier": "레전드리", "parts": ["무보엠"]},
     "[아랫잠/무보엠] 에디 공격력/마력 21% 이상 (2줄)": {"prob_pct": 1.8180, "tier": "레전드리", "parts": ["무보엠"]},
-    "🔗 mesu.live 아랫잠 세부 확률(%) 직접 입력": {"prob_pct": None, "tier": "레전드리", "parts": ["장신구", "방어구", "장갑", "모자", "무보엠"]}
+    "🔗 mesu.live 아랫잠 세부 확률(%) 직접 입력": {"prob_pct": None, "tier": "레전드리", "parts": ALL_PARTS}
 }
 
 MAPLE_FLAME_PRESETS = {
@@ -557,7 +563,6 @@ STARFORCE_EVENTS = {
     "✨ 샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 30% 감소)": {"cost_mult": 0.70, "boom_mult": 0.70},
 }
 
-# 2025.03 개편 넥슨 공식 스타포스 확률 (s -> s+1: 성공확률, 파괴확률 / 하락 없음)
 SF_OFFICIAL_PROB = {
     0: (0.95, 0.0), 1: (0.90, 0.0), 2: (0.85, 0.0), 3: (0.85, 0.0), 4: (0.80, 0.0),
     5: (0.75, 0.0), 6: (0.70, 0.0), 7: (0.65, 0.0), 8: (0.60, 0.0), 9: (0.55, 0.0),
@@ -592,7 +597,6 @@ def calc_starforce_expected(item_lv, start_star, target_star, spare_cost_man, ev
     c_mult = ev["cost_mult"]
     b_mult = ev["boom_mult"]
 
-    # s -> s+1 단계별 기대 메소비(F_meso) 및 기대 파괴수(F_boom) 마르코프 체인 정밀 계산 (파괴 시 12성 복구)
     F_meso = [0.0] * 22
     F_boom = [0.0] * 22
 
@@ -600,12 +604,10 @@ def calc_starforce_expected(item_lv, start_star, target_star, spare_cost_man, ev
         p_base, b_base = SF_OFFICIAL_PROB[s]
         base_man = get_sf_click_base_man(item_lv, s)
 
-        # 파괴방지 (15~17성: 기본비용 +200% 추가, 파괴확률 0)
         sg_active = use_safeguard and (15 <= s <= 17)
         b_cur = 0.0 if sg_active else (b_base * (b_mult if s <= 21 else 1.0))
         click_man = (base_man * c_mult) + (base_man * 2.0 if sg_active else 0.0)
 
-        # 스타캐치 (성공확률 1.05배, 실패/파괴 비율 비례 축소)
         if use_starcatch and p_base < 1.0:
             p_cur = min(1.0, p_base * 1.05)
             rem_scale = (1.0 - p_cur) / max(1e-9, 1.0 - p_base)
@@ -1671,7 +1673,7 @@ with tab_gersang:
 # [파트 2 끝]
 # [파트 3 시작]
 # ==============================================================================
-# 탭 3: 🍁 메이플스토리 화면 (2026 넥슨 공식 엔진 + 단품/반제품 초고속 견적기)
+# 탭 3: 🍁 메이플스토리 화면 (2026 넥슨 공식 엔진 + 순수 등업 전용 + 단품/반제품 견적기)
 # ==============================================================================
 with tab_maple:
     render_game_timer("maple", "메이플스토리", default_min=30)
@@ -1743,7 +1745,7 @@ with tab_maple:
 
     mp_sub1, mp_sub2, mp_sub3, mp_sub4, mp_sub5 = st.tabs([
         "🏆 1. 사냥 vs 장사 시급 판독기 & 🧪 비약 원가",
-        "🛠️ 2. 2026 공식 견적기 (단품/반제품/풀세팅)",
+        "🛠️ 2. 2026 공식 견적기 (등업만/단품/풀세팅)",
         "💱 3. 메소마켓 (시세 일지 & % 보정 & AI 추천)",
         "📖 4. 메이플 장사 가계부 & 시세 족보",
         "📘 5. 직작 & 장사 백과사전 (추옵/옵션/작 자동판독기)"
@@ -1896,13 +1898,12 @@ with tab_maple:
                     )
 
     # --------------------------------------------------------------------------
-    # 🛠️ [서브탭 2] 2026 넥슨 공식 단품·반제품·올인원 종합 견적 & 매물 판독기
+    # 🛠️ [서브탭 2] 2026 넥슨 공식 단품·반제품·순수 등업·올인원 종합 견적 & 매물 판독기
     # --------------------------------------------------------------------------
     with mp_sub2:
-        st.markdown("#### 🛠️ 2026 넥슨 공식 단품·반제품·풀세팅 견적기 (`잠재 4구간 · 에디 공식확률 · 2025개편 스타포스 수식`)")
+        st.markdown("#### 🛠️ 2026 넥슨 공식 단품·반제품·순수 등업·풀세팅 견적기 (`잠재 4구간 · 에디 공식확률 · 2025개편 스타포스`)")
         st.caption(
-            "**위 `[⚡ 단품 초고속 조회]` 버튼을 누르면 필요한 파트 1개만 켜져서 반제품(예: 레전 윗잠만 붙은 매물) 시세를 3초 만에 감정할 수 있습니다!** "
-            "원하는 체크박스를 추가로 켜서 `윗잠 + 스타포스` 같은 조합 견적도 자유롭게 확인하세요."
+            "**[⚡ 단품 초고속 조회]**로 원하는 파트 1개만 켜고, 윗잠·아랫잠 옵션 맨 위의 **`⭐ [등업만]`**을 고르면 옵션 비용 없이 순수 등업 기댓값과 천장 비용만 즉시 계산됩니다!"
         )
 
         AUTO_TRACE_SPEC = {
@@ -1944,7 +1945,6 @@ with tab_maple:
             if pk not in st.session_state:
                 st.session_state[pk] = pv
 
-        # 구버전 세션값 자동 보정
         if st.session_state.est_lv not in lv_list:
             st.session_state.est_lv = lv_list[1]
             st.session_state.est_exact_lv = BRACKET_DEFAULT_LV[lv_list[1]]
@@ -1988,9 +1988,19 @@ with tab_maple:
                     st.session_state.est_use_main = True; st.session_state.est_use_adi = True; st.session_state.est_include_base = True
                     st.rerun()
 
-            with st.expander("🎯 국민 완제품 원클릭 프리셋 펼치기 (미카엘라 드메 / 18성·22성 / 제네시스 해방무기)", expanded=False):
+            with st.expander("🎯 국민 완제품 & 순수 등업 원클릭 프리셋 펼치기", expanded=False):
                 pr1, pr2, pr3, pr4, pr5, pr6 = st.columns(6)
                 with pr1:
+                    if st.button("⭐ 레전 잡옵 반제품 감정", use_container_width=True):
+                        st.session_state.est_name = "레전드리 잡옵 반제품 (순수 등업 원가 비교)"
+                        st.session_state.est_lv = lv_list[1]; st.session_state.est_exact_lv = 160; st.session_state.est_part = MAPLE_EQUIP_PARTS[0]
+                        st.session_state.est_base = 5000.0; st.session_state.est_include_base = True; st.session_state.est_auc = 180000.0; st.session_state.est_val_shift = 0.0
+                        st.session_state.est_use_flm = False; st.session_state.est_use_scr = False; st.session_state.est_use_sf = False
+                        st.session_state.est_use_main = True; st.session_state.est_use_adi = False
+                        st.session_state.est_main_start = "에픽"
+                        st.session_state.est_main_opt = "⭐ [등업만] 레전드리 등급 달성 (옵션 무관 · 순수 등업비)"
+                        st.rerun()
+                with pr2:
                     if st.button("👓 90제 미카엘라 드메2줄", use_container_width=True):
                         st.session_state.est_name = "미카엘라의 새 안경 (90제 드메2줄)"
                         st.session_state.est_lv = lv_list[0]; st.session_state.est_exact_lv = 90; st.session_state.est_part = MAPLE_EQUIP_PARTS[0]
@@ -1999,18 +2009,6 @@ with tab_maple:
                         st.session_state.est_use_main = True; st.session_state.est_use_adi = False
                         st.session_state.est_main_start = "에픽"
                         st.session_state.est_main_opt = "[레전드리/장신구] 드랍+메획 총합 2줄 이상 (드메 2줄 핵심!)"
-                        st.rerun()
-                with pr2:
-                    if st.button("💍 17성 유니크 가성비", use_container_width=True):
-                        st.session_state.est_name = "17성 유니크 가성비 방어구/장신구"
-                        st.session_state.est_lv = lv_list[1]; st.session_state.est_exact_lv = 160; st.session_state.est_part = MAPLE_EQUIP_PARTS[0]
-                        st.session_state.est_base = 3000.0; st.session_state.est_include_base = True; st.session_state.est_auc = 95000.0; st.session_state.est_val_shift = 0.0
-                        st.session_state.est_use_flm = True; st.session_state.est_fl_cat = "보스 장신구/방어구 (추옵 보정 O)"
-                        st.session_state.est_use_scr = True; st.session_state.est_use_sf = True
-                        st.session_state.est_sf_start = 0; st.session_state.est_sf_target = 17
-                        st.session_state.est_use_main = True; st.session_state.est_use_adi = True
-                        st.session_state.est_main_start = "에픽"; st.session_state.est_main_opt = "[유니크] 주스탯 15% ~ 18% (유니크 2줄)"
-                        st.session_state.est_adi_start = "레어"; st.session_state.est_adi_opt = "[아랫잠/에픽] 공/마 +10 또는 주스탯 4%+ (에디 에픽 1.5~2줄)"
                         st.rerun()
                 with pr3:
                     if st.button("🔥 18성 레전27% 국민템", use_container_width=True):
@@ -2089,7 +2087,7 @@ with tab_maple:
                     include_base = st.checkbox(
                         f"초기 노작 1개값({fmt_man(base_item_price, '메소')})을 총원가에 합산",
                         value=bool(st.session_state.est_include_base),
-                        help="반제품 매물(노작+윗잠)을 감정할 땐 켜두고, 이미 가진 템에 스타포스/추옵만 추가로 돌릴 땐 끄세요. (꺼도 스타포스 파괴 시 스페어 비용엔 자동 반영됩니다!)"
+                        help="반제품 매물(노작+윗잠)을 감정할 땐 켜두고, 이미 가진 템의 순수 등업비/스타포스비만 볼 땐 끄세요."
                     )
                     st.session_state.est_include_base = include_base
                 with b_c2:
@@ -2115,9 +2113,9 @@ with tab_maple:
                     )
                     st.session_state.est_val_shift = market_valuation_shift
 
-            # [파트 1] 윗잠(잠재능력) - 가장 많이 조회하므로 최상단 배치!
+            # [파트 1] 윗잠(잠재능력) - 순수 등업 전용 옵션 지원!
             with st.container(border=True):
-                use_main_pot = st.checkbox("🎲 [파트 1] 윗잠(잠재능력) 견적 포함하기 (2026 넥슨 공식 비용·확률)", value=st.session_state.est_use_main)
+                use_main_pot = st.checkbox("🎲 [파트 1] 윗잠(잠재능력) 견적 포함하기 (순수 등업만 / 옵션 포함 선택 가능)", value=st.session_state.est_use_main)
                 st.session_state.est_use_main = use_main_pot
                 main_norm_cost, main_mira_cost = 0.0, 0.0
                 main_p50_mira, main_p85_mira, main_p95_mira = 0.0, 0.0, 0.0
@@ -2127,7 +2125,7 @@ with tab_maple:
                     m_idx = filtered_m_opts.index(st.session_state.est_main_opt) if st.session_state.est_main_opt in filtered_m_opts else 0
                     mc_top1, mc_top2 = st.columns([1.8, 1.0])
                     with mc_top1:
-                        main_opt_sel = st.selectbox(f"윗잠 목표 옵션 ({part_short} 전용 필터 적용됨)", filtered_m_opts, index=m_idx)
+                        main_opt_sel = st.selectbox(f"윗잠 목표 선택 (맨 위 '⭐ [등업만]' 선택 시 순수 등업비만 계산!)", filtered_m_opts, index=m_idx)
                         st.session_state.est_main_opt = main_opt_sel
                     m_info = MAPLE_MAIN_POT_OPTIONS[main_opt_sel]
                     with mc_top2:
@@ -2136,36 +2134,56 @@ with tab_maple:
                         st.session_state.est_main_start = m_start_t
 
                     m_targ_t = m_info["tier"]
-                    m_unit_c = float(MAPLE_CUBE_COST_TABLE["윗잠 (잠재능력)"][lv_bracket][m_targ_t])
-                    m_prob = float(m_info["prob_pct"]) if m_info["prob_pct"] is not None else 1.5000
+                    m_is_tu_only = bool(m_info.get("tierup_only", False))
 
-                    if m_info["prob_pct"] is None or st.checkbox("✏️ 윗잠 확률/비용 수동 미세조정 (특수 옵션용)", value=False, key="m_manual_chk"):
-                        mc_sub1, mc_sub2, mc_sub3 = st.columns(3)
-                        with mc_sub1:
-                            m_targ_t = st.selectbox("수동 목표등급", TIER_ORDER, index=TIER_ORDER.index(m_targ_t), key=f"m_tt_{main_opt_sel}")
-                        with mc_sub2:
-                            m_unit_c = st.number_input("수동 1회 비용(만)", value=float(MAPLE_CUBE_COST_TABLE["윗잠 (잠재능력)"][lv_bracket][m_targ_t]), step=100.0, format="%.0f", key=f"m_uc_{lv_bracket}_{m_targ_t}")
-                        with mc_sub3:
-                            m_prob = st.number_input("수동 확률(%)", value=m_prob, step=0.1, format="%.4f", key=f"m_pr_{main_opt_sel}")
+                    if m_is_tu_only:
+                        m_tu_norm = calc_mesu_tierup("윗잠 (잠재능력)", lv_bracket, m_start_t, m_targ_t, False)
+                        m_tu_mira = calc_mesu_tierup("윗잠 (잠재능력)", lv_bracket, m_start_t, m_targ_t, True)
+                        main_norm_cost = m_tu_norm["mean_cost"]
+                        main_mira_cost = m_tu_mira["mean_cost"]
+                        main_p50_mira = m_tu_mira["p50_cost"]
+                        main_p85_mira = m_tu_mira["p85_cost"]
+                        main_p95_mira = m_tu_mira["p95_cost"]
+                        main_desc = f"[순수등업] {m_start_t}➔{m_targ_t} (평일 {m_tu_norm['mean_tries']:.1f}회 / 미라클 {m_tu_mira['mean_tries']:.1f}회 / 천장 {fmt_man(m_tu_norm['ceil_cost'], '메소')})"
+                        if TIER_ORDER.index(m_start_t) >= TIER_ORDER.index(m_targ_t):
+                            st.warning(f"⚠️ 시작 등급(`{m_start_t}`)이 목표 등급(`{m_targ_t}`)과 같거나 높아 등업 비용이 **0 메소**입니다. 오른쪽 시작 등급을 낮춰주세요.")
+                        else:
+                            st.info(
+                                f"⭐ **윗잠 순수 등업 견적 (`{m_start_t} ➔ {m_targ_t}`, 옵션 비용 0원):**\n"
+                                f"- 평일 평균: **{fmt_man(main_norm_cost, '메소')}** (`{m_tu_norm['mean_tries']:.1f}회`) | ✨ **미라클 평균: `{fmt_man(main_mira_cost, '메소')}`** (`{m_tu_mira['mean_tries']:.1f}회`)\n"
+                                f"- 🛡️ 100% 천장 합계(최악 기준): **`{fmt_man(m_tu_norm['ceil_cost'], '메소')}`**"
+                            )
+                    else:
+                        m_unit_c = float(MAPLE_CUBE_COST_TABLE["윗잠 (잠재능력)"][lv_bracket][m_targ_t])
+                        m_prob = float(m_info["prob_pct"]) if m_info["prob_pct"] is not None else 1.5000
 
-                    m_tu_norm = calc_mesu_tierup("윗잠 (잠재능력)", lv_bracket, m_start_t, m_targ_t, False)
-                    m_tu_mira = calc_mesu_tierup("윗잠 (잠재능력)", lv_bracket, m_start_t, m_targ_t, True)
-                    m_opt_st = calc_mesu_option_stats(m_prob, m_unit_c)
+                        if m_info["prob_pct"] is None or st.checkbox("✏️ 윗잠 확률/비용 수동 미세조정 (특수 옵션용)", value=False, key="m_manual_chk"):
+                            mc_sub1, mc_sub2, mc_sub3 = st.columns(3)
+                            with mc_sub1:
+                                m_targ_t = st.selectbox("수동 목표등급", TIER_ORDER, index=TIER_ORDER.index(m_targ_t), key=f"m_tt_{main_opt_sel}")
+                            with mc_sub2:
+                                m_unit_c = st.number_input("수동 1회 비용(만)", value=float(MAPLE_CUBE_COST_TABLE["윗잠 (잠재능력)"][lv_bracket][m_targ_t]), step=100.0, format="%.0f", key=f"m_uc_{lv_bracket}_{m_targ_t}")
+                            with mc_sub3:
+                                m_prob = st.number_input("수동 확률(%)", value=m_prob, step=0.1, format="%.4f", key=f"m_pr_{main_opt_sel}")
 
-                    main_norm_cost = m_tu_norm["mean_cost"] + m_opt_st["mean_cost"]
-                    main_mira_cost = m_tu_mira["mean_cost"] + m_opt_st["mean_cost"]
-                    main_p50_mira = m_tu_mira["p50_cost"] + m_opt_st["p50_cost"]
-                    main_p85_mira = m_tu_mira["p85_cost"] + m_opt_st["p85_cost"]
-                    main_p95_mira = m_tu_mira["p95_cost"] + m_opt_st["p95_cost"]
-                    main_desc = f"{m_start_t}➔{m_targ_t} | {main_opt_sel[:16]} ({m_prob:.3f}% / 평균 {m_opt_st['mean_tries']:.1f}회)"
-                    st.info(
-                        f"✅ **윗잠 공식 견적:** `{m_start_t} ➔ {m_targ_t}` | 1회 **`{fmt_man(m_unit_c, '메소')}`** | 확률 **`{m_prob:.4f}%`** (평균 **`{m_opt_st['mean_tries']:.1f}회`**)\n"
-                        f"👉 평일 기대값: **{fmt_man(main_norm_cost, '메소')}** / ✨ **미라클 데이: `{fmt_man(main_mira_cost, '메소')}`**"
-                    )
+                        m_tu_norm = calc_mesu_tierup("윗잠 (잠재능력)", lv_bracket, m_start_t, m_targ_t, False)
+                        m_tu_mira = calc_mesu_tierup("윗잠 (잠재능력)", lv_bracket, m_start_t, m_targ_t, True)
+                        m_opt_st = calc_mesu_option_stats(m_prob, m_unit_c)
 
-            # [파트 2] 아랫잠(에디셔널) - 2026 공식 비용/확률/천장 반영
+                        main_norm_cost = m_tu_norm["mean_cost"] + m_opt_st["mean_cost"]
+                        main_mira_cost = m_tu_mira["mean_cost"] + m_opt_st["mean_cost"]
+                        main_p50_mira = m_tu_mira["p50_cost"] + m_opt_st["p50_cost"]
+                        main_p85_mira = m_tu_mira["p85_cost"] + m_opt_st["p85_cost"]
+                        main_p95_mira = m_tu_mira["p95_cost"] + m_opt_st["p95_cost"]
+                        main_desc = f"{m_start_t}➔{m_targ_t} | {main_opt_sel[:16]} ({m_prob:.3f}% / 평균 {m_opt_st['mean_tries']:.1f}회)"
+                        st.info(
+                            f"✅ **윗잠 공식 견적:** `{m_start_t} ➔ {m_targ_t}` | 1회 **`{fmt_man(m_unit_c, '메소')}`** | 확률 **`{m_prob:.4f}%`** (평균 **`{m_opt_st['mean_tries']:.1f}회`**)\n"
+                            f"👉 평일 기대값: **{fmt_man(main_norm_cost, '메소')}** / ✨ **미라클 데이: `{fmt_man(main_mira_cost, '메소')}`**"
+                        )
+
+            # [파트 2] 아랫잠(에디셔널) - 순수 등업 전용 옵션 지원!
             with st.container(border=True):
-                use_adi_pot = st.checkbox("✨ [파트 2] 아랫잠(에디셔널) 견적 포함하기 (2026 넥슨 공식 비용·확률·천장)", value=st.session_state.est_use_adi)
+                use_adi_pot = st.checkbox("✨ [파트 2] 아랫잠(에디셔널) 견적 포함하기 (순수 등업만 / 옵션 포함 선택 가능)", value=st.session_state.est_use_adi)
                 st.session_state.est_use_adi = use_adi_pot
                 adi_norm_cost, adi_mira_cost = 0.0, 0.0
                 adi_p50_mira, adi_p85_mira, adi_p95_mira = 0.0, 0.0, 0.0
@@ -2175,7 +2193,7 @@ with tab_maple:
                     a_idx = filtered_a_opts.index(st.session_state.est_adi_opt) if st.session_state.est_adi_opt in filtered_a_opts else 0
                     ac_top1, ac_top2 = st.columns([1.8, 1.0])
                     with ac_top1:
-                        adi_opt_sel = st.selectbox(f"아랫잠 목표 옵션 ({part_short} 전용 필터 적용됨)", filtered_a_opts, index=a_idx)
+                        adi_opt_sel = st.selectbox(f"아랫잠 목표 선택 (맨 위 '⭐ [등업만]' 선택 시 순수 등업비만 계산!)", filtered_a_opts, index=a_idx)
                         st.session_state.est_adi_opt = adi_opt_sel
                     a_info = MAPLE_ADI_POT_OPTIONS[adi_opt_sel]
                     with ac_top2:
@@ -2184,32 +2202,52 @@ with tab_maple:
                         st.session_state.est_adi_start = a_start_t
 
                     a_targ_t = a_info["tier"]
-                    a_unit_c = float(MAPLE_CUBE_COST_TABLE["아랫잠 (에디셔널)"][lv_bracket][a_targ_t])
-                    a_prob = float(a_info["prob_pct"]) if a_info["prob_pct"] is not None else 2.2200
+                    a_is_tu_only = bool(a_info.get("tierup_only", False))
 
-                    if a_info["prob_pct"] is None or st.checkbox("✏️ 아랫잠 확률/비용 수동 미세조정 (특수 옵션용)", value=False, key="a_manual_chk"):
-                        ac_sub1, ac_sub2, ac_sub3 = st.columns(3)
-                        with ac_sub1:
-                            a_targ_t = st.selectbox("수동 에디 등급", TIER_ORDER, index=TIER_ORDER.index(a_targ_t), key=f"a_tt_{adi_opt_sel}")
-                        with ac_sub2:
-                            a_unit_c = st.number_input("수동 에디 1회 비용(만)", value=float(MAPLE_CUBE_COST_TABLE["아랫잠 (에디셔널)"][lv_bracket][a_targ_t]), step=100.0, format="%.0f", key=f"a_uc_{lv_bracket}_{a_targ_t}")
-                        with ac_sub3:
-                            a_prob = st.number_input("수동 에디 확률(%)", value=a_prob, step=0.1, format="%.4f", key=f"a_pr_{adi_opt_sel}")
+                    if a_is_tu_only:
+                        a_tu_norm = calc_mesu_tierup("아랫잠 (에디셔널)", lv_bracket, a_start_t, a_targ_t, False)
+                        a_tu_mira = calc_mesu_tierup("아랫잠 (에디셔널)", lv_bracket, a_start_t, a_targ_t, True)
+                        adi_norm_cost = a_tu_norm["mean_cost"]
+                        adi_mira_cost = a_tu_mira["mean_cost"]
+                        adi_p50_mira = a_tu_mira["p50_cost"]
+                        adi_p85_mira = a_tu_mira["p85_cost"]
+                        adi_p95_mira = a_tu_mira["p95_cost"]
+                        adi_desc = f"[에디순수등업] {a_start_t}➔{a_targ_t} (평일 {a_tu_norm['mean_tries']:.1f}회 / 미라클 {a_tu_mira['mean_tries']:.1f}회 / 천장 {fmt_man(a_tu_norm['ceil_cost'], '메소')})"
+                        if TIER_ORDER.index(a_start_t) >= TIER_ORDER.index(a_targ_t):
+                            st.warning(f"⚠️ 에디 시작 등급(`{a_start_t}`)이 목표 등급(`{a_targ_t}`)과 같거나 높아 등업 비용이 **0 메소**입니다. 오른쪽 시작 등급을 낮춰주세요.")
+                        else:
+                            st.info(
+                                f"⭐ **아랫잠(에디) 순수 등업 견적 (`{a_start_t} ➔ {a_targ_t}`, 옵션 비용 0원):**\n"
+                                f"- 평일 평균: **{fmt_man(adi_norm_cost, '메소')}** (`{a_tu_norm['mean_tries']:.1f}회`) | ✨ **미라클 평균: `{fmt_man(adi_mira_cost, '메소')}`** (`{a_tu_mira['mean_tries']:.1f}회`)\n"
+                                f"- 🛡️ 100% 천장 합계(최악 기준): **`{fmt_man(a_tu_norm['ceil_cost'], '메소')}`**"
+                            )
+                    else:
+                        a_unit_c = float(MAPLE_CUBE_COST_TABLE["아랫잠 (에디셔널)"][lv_bracket][a_targ_t])
+                        a_prob = float(a_info["prob_pct"]) if a_info["prob_pct"] is not None else 2.2200
 
-                    a_tu_norm = calc_mesu_tierup("아랫잠 (에디셔널)", lv_bracket, a_start_t, a_targ_t, False)
-                    a_tu_mira = calc_mesu_tierup("아랫잠 (에디셔널)", lv_bracket, a_start_t, a_targ_t, True)
-                    a_opt_st = calc_mesu_option_stats(a_prob, a_unit_c)
+                        if a_info["prob_pct"] is None or st.checkbox("✏️ 아랫잠 확률/비용 수동 미세조정 (특수 옵션용)", value=False, key="a_manual_chk"):
+                            ac_sub1, ac_sub2, ac_sub3 = st.columns(3)
+                            with ac_sub1:
+                                a_targ_t = st.selectbox("수동 에디 등급", TIER_ORDER, index=TIER_ORDER.index(a_targ_t), key=f"a_tt_{adi_opt_sel}")
+                            with ac_sub2:
+                                a_unit_c = st.number_input("수동 에디 1회 비용(만)", value=float(MAPLE_CUBE_COST_TABLE["아랫잠 (에디셔널)"][lv_bracket][a_targ_t]), step=100.0, format="%.0f", key=f"a_uc_{lv_bracket}_{a_targ_t}")
+                            with ac_sub3:
+                                a_prob = st.number_input("수동 에디 확률(%)", value=a_prob, step=0.1, format="%.4f", key=f"a_pr_{adi_opt_sel}")
 
-                    adi_norm_cost = a_tu_norm["mean_cost"] + a_opt_st["mean_cost"]
-                    adi_mira_cost = a_tu_mira["mean_cost"] + a_opt_st["mean_cost"]
-                    adi_p50_mira = a_tu_mira["p50_cost"] + a_opt_st["p50_cost"]
-                    adi_p85_mira = a_tu_mira["p85_cost"] + a_opt_st["p85_cost"]
-                    adi_p95_mira = a_tu_mira["p95_cost"] + a_opt_st["p95_cost"]
-                    adi_desc = f"{a_start_t}➔{a_targ_t} | {adi_opt_sel[:16]} ({a_prob:.3f}% / 평균 {a_opt_st['mean_tries']:.1f}회)"
-                    st.info(
-                        f"✅ **아랫잠 공식 견적:** `{a_start_t} ➔ {a_targ_t}` | 1회 **`{fmt_man(a_unit_c, '메소')}`** | 확률 **`{a_prob:.4f}%`** (평균 **`{a_opt_st['mean_tries']:.1f}회`**)\n"
-                        f"👉 평일 기대값: **{fmt_man(adi_norm_cost, '메소')}** / ✨ **미라클 데이: `{fmt_man(adi_mira_cost, '메소')}`**"
-                    )
+                        a_tu_norm = calc_mesu_tierup("아랫잠 (에디셔널)", lv_bracket, a_start_t, a_targ_t, False)
+                        a_tu_mira = calc_mesu_tierup("아랫잠 (에디셔널)", lv_bracket, a_start_t, a_targ_t, True)
+                        a_opt_st = calc_mesu_option_stats(a_prob, a_unit_c)
+
+                        adi_norm_cost = a_tu_norm["mean_cost"] + a_opt_st["mean_cost"]
+                        adi_mira_cost = a_tu_mira["mean_cost"] + a_opt_st["mean_cost"]
+                        adi_p50_mira = a_tu_mira["p50_cost"] + a_opt_st["p50_cost"]
+                        adi_p85_mira = a_tu_mira["p85_cost"] + a_opt_st["p85_cost"]
+                        adi_p95_mira = a_tu_mira["p95_cost"] + a_opt_st["p95_cost"]
+                        adi_desc = f"{a_start_t}➔{a_targ_t} | {adi_opt_sel[:16]} ({a_prob:.3f}% / 평균 {a_opt_st['mean_tries']:.1f}회)"
+                        st.info(
+                            f"✅ **아랫잠 공식 견적:** `{a_start_t} ➔ {a_targ_t}` | 1회 **`{fmt_man(a_unit_c, '메소')}`** | 확률 **`{a_prob:.4f}%`** (평균 **`{a_opt_st['mean_tries']:.1f}회`**)\n"
+                            f"👉 평일 기대값: **{fmt_man(adi_norm_cost, '메소')}** / ✨ **미라클 데이: `{fmt_man(adi_mira_cost, '메소')}`**"
+                        )
 
             # [파트 3] 스타포스 - 2025 개편 넥슨 공식 수식 + 시작→목표 구간 계산
             with st.container(border=True):
@@ -2341,8 +2379,10 @@ with tab_maple:
         with e_col2:
             with st.container(border=True):
                 active_names = []
-                if use_main_pot: active_names.append("🎲윗잠")
-                if use_adi_pot: active_names.append("✨아랫잠")
+                if use_main_pot:
+                    active_names.append("⭐윗잠등업만" if MAPLE_MAIN_POT_OPTIONS.get(st.session_state.est_main_opt, {}).get("tierup_only") else "🎲윗잠")
+                if use_adi_pot:
+                    active_names.append("⭐에디등업만" if MAPLE_ADI_POT_OPTIONS.get(st.session_state.est_adi_opt, {}).get("tierup_only") else "✨아랫잠")
                 if use_sf: active_names.append(f"⭐스타포스({st.session_state.est_sf_start}➔{st.session_state.est_sf_target}성)")
                 if use_flame: active_names.append("🔥추옵")
                 if use_scroll: active_names.append("📜작")

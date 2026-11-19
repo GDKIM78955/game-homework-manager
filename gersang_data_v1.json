@@ -1,5 +1,5 @@
 {
-  "last_daily_date": "2026-11-18",
+  "last_daily_date": "2026-11-19",
   "daily_tasks": {
     "quest": false,
     "factory": false,
@@ -7,27 +7,19 @@
   },
   "client2_farm": {
     "current_money": 0.0,
-    "drop_item_name": "주력 드랍템",
-    "drop_item_price": 10.0,
-    "drops_per_hour": 30.0,
-    "extra_hourly_man": 500.0,
+    "drop_item_name": "선조희조각",
+    "drop_item_price": 50.0,
+    "drops_per_hour": 10.0,
+    "extra_hourly_man": 0.0,
     "daily_hours": 2.0,
     "targets": [
       {
         "id": 1,
-        "포함": false,
-        "아이템명": "다음 단계 목표템 1 (클릭해 수정)",
-        "목표가": 50000.0,
+        "포함": true,
+        "아이템명": "철괴리 인형",
+        "목표가": 160000.0,
         "구매완료": false,
-        "메모": "예: 5억 전"
-      },
-      {
-        "id": 2,
-        "포함": false,
-        "아이템명": "다음 단계 목표템 2 (클릭해 수정)",
-        "목표가": 30000.0,
-        "구매완료": false,
-        "메모": "예: 3억 전"
+        "메모": ""
       }
     ],
     "profit_link_mode": "합산 안 함 (2클라 자체 자금만)"

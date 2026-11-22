@@ -1,6 +1,6 @@
 {
   "last_weekly_reset": "2026-11-19T18:49:33.610900+09:00",
-  "last_daily_date": "2026-11-20",
+  "last_daily_date": "2026-11-22",
   "fee_rate": 0.05,
   "accounts": [
     {
@@ -99,12 +99,18 @@
       "날짜": "2026-11-18 22:01",
       "시세(1억당메포)": 2095.0,
       "메모": ""
+    },
+    {
+      "id": 3,
+      "날짜": "2026-11-22 21:32",
+      "시세(1억당메포)": 2158.0,
+      "메모": "미라클데이"
     }
   ],
   "meso_market_cfg": {
     "shift_pct": 0.0,
     "band_threshold": 5.0,
-    "current_watch_rate": 2095.0
+    "current_watch_rate": 2158.0
   },
   "jokbo_shift_pct": 0.0
 }

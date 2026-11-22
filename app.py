@@ -2545,62 +2545,236 @@ with tab_maple:
 # [파트 3 끝]
 # [파트 4 시작]
     # --------------------------------------------------------------------------
-    # 💱 [서브탭 3] 메소마켓 (시세 일지 트래커 + 외부요인 % 일괄 보정 + AI 매수/매도 타이밍 판독기)
+    # 💱 [서브탭 3] 메소마켓 (1% 수수료 · 보유 메포 평단가 지갑 · 타섭 메포 지출 · AI 판독기)
     # --------------------------------------------------------------------------
     with mp_sub3:
-        st.markdown("#### 💱 메소마켓 시세 트래커 & 외부요인 `%` 보정 AI 매매 타이밍 판독기")
+        st.markdown("#### 💱 메소마켓 포트폴리오 & 시세 트래커 (`1% 수수료 · 보유 평단가 · 타섭 메포 지출 차감`)")
         st.caption(
-            "거래를 직접 하지 않더라도 **평소 시세(1억 메소당 메포)만 꾸준히 기록**해 두세요! "
-            "대규모 패치나 인플레이션 등 외부 요인으로 시세 레벨이 바뀌면 **`외부요인 보정 %`**만 조절해 과거 기준선 전체를 현재 가치로 자동 스케일링하고 매수/매도 타이밍을 판독합니다."
+            "메소 판매(메포 매수) 시 **1% 수수료**를 자동 반영해 **보유 메포 잔고와 실질 평단가(본전선)**를 실시간 추적합니다. "
+            "타 서버(`[W]`) 아이템 구매로 빠져나간 메포도 **`🛒 메포 지출`**로 기록해 잔고를 정확히 맞출 수 있습니다."
         )
 
         mm_cfg = mp_data["meso_market_cfg"]
         rate_logs = mp_data["meso_rate_logs"]
+        mm_list = mp_data["meso_market"]
+
+        # ── 보유 메포 지갑 & 이동평균 평단가 시뮬레이션 ──
+        held_mp = 0.0
+        cost_meso_eok = 0.0
+        realized_profit_eok = 0.0
+        total_spent_mp = 0.0
+        total_spent_meso_eok = 0.0
+        total_fee_mp = 0.0
+        row_calc_meta = {}
+
+        for tx in sorted(mm_list, key=lambda x: x.get("id", 0)):
+            tid = tx.get("id", 0)
+            gubun = str(tx.get("구분", ""))
+            rate_v = float(tx.get("환율(1억당메포)", 0.0))
+            eok_v = float(tx.get("메소(억)", 0.0))
+
+            if "매수" in gubun:
+                fee_p = float(tx.get("수수료율(%)", 1.0))
+                gross_mp = rate_v * eok_v
+                net_mp = int(round(gross_mp * (1.0 - fee_p / 100.0))) if rate_v > 0 and eok_v > 0 else int(tx.get("총메이플포인트", 0))
+                fee_mp = max(0.0, gross_mp - net_mp)
+                total_fee_mp += fee_mp
+                held_mp += net_mp
+                cost_meso_eok += eok_v
+                eff_rate = (net_mp / eok_v) if eok_v > 0 else 0.0
+                row_calc_meta[tid] = {
+                    "net_mp": net_mp, "fee_p": fee_p,
+                    "note": f"실수령 {eff_rate:,.0f}P/억 (수수료 -{int(round(fee_mp)):,}P)"
+                }
+            elif "매도" in gubun:
+                fee_p = float(tx.get("수수료율(%)", 0.0))
+                used_mp = int(round(rate_v * eok_v)) if rate_v > 0 and eok_v > 0 else int(tx.get("총메이플포인트", 0))
+                if held_mp > 0 and cost_meso_eok > 0:
+                    avg_r = held_mp / cost_meso_eok
+                    basis_eok = used_mp / avg_r
+                    profit_eok = eok_v - basis_eok
+                    realized_profit_eok += profit_eok
+                    held_mp = max(0.0, held_mp - used_mp)
+                    cost_meso_eok = max(0.0, cost_meso_eok - basis_eok)
+                    if held_mp < 1.0:
+                        held_mp = 0.0
+                        cost_meso_eok = 0.0
+                    sign_s = "+" if profit_eok >= 0 else ""
+                    row_calc_meta[tid] = {
+                        "net_mp": used_mp, "fee_p": fee_p,
+                        "note": f"{'🟢' if profit_eok >= 0 else '🔴'} {sign_s}{profit_eok:.2f}억 실현"
+                    }
+                else:
+                    row_calc_meta[tid] = {"net_mp": used_mp, "fee_p": fee_p, "note": "보유 기록 없음"}
+            else:
+                spent_mp = int(abs(float(tx.get("총메이플포인트", 0))))
+                total_spent_mp += spent_mp
+                if held_mp > 0 and cost_meso_eok > 0:
+                    avg_r = held_mp / cost_meso_eok
+                    spent_basis_eok = min(cost_meso_eok, spent_mp / avg_r)
+                    total_spent_meso_eok += spent_basis_eok
+                    held_mp = max(0.0, held_mp - spent_mp)
+                    cost_meso_eok = max(0.0, cost_meso_eok - spent_basis_eok)
+                    if held_mp < 1.0:
+                        held_mp = 0.0
+                        cost_meso_eok = 0.0
+                    row_calc_meta[tid] = {
+                        "net_mp": spent_mp, "fee_p": 0.0,
+                        "note": f"🛒 잔고차감 (약 {spent_basis_eok:.2f}억 환산)"
+                    }
+                else:
+                    row_calc_meta[tid] = {"net_mp": spent_mp, "fee_p": 0.0, "note": "🛒 지출 기록"}
+
+        avg_held_rate = (held_mp / cost_meso_eok) if (held_mp > 0 and cost_meso_eok > 0) else 0.0
+        cur_watch_init = float(mm_cfg.get("current_watch_rate", 2400.0))
+        eval_meso_eok = (held_mp / cur_watch_init) if (held_mp > 0 and cur_watch_init > 0) else 0.0
+        unrealized_eok = eval_meso_eok - cost_meso_eok
+        unrealized_pct = ((unrealized_eok / cost_meso_eok) * 100.0) if cost_meso_eok > 0 else 0.0
+
+        # ── 상단 보유 메포 지갑 대시보드 ──
+        with st.container(border=True):
+            st.markdown("##### 💼 내 보유 메이플포인트 지갑 현황 (1% 수수료 & 타섭 지출 차감 반영)")
+            w1, w2, w3, w4, w5 = st.columns(5)
+            w1.metric("💰 현재 보유 메포", f"{int(round(held_mp)):,} P", f"투입 원가: {cost_meso_eok:.2f}억")
+            w2.metric("⚖️ 내 실질 평단가 (본전선)", f"{avg_held_rate:,.0f} P/억" if avg_held_rate > 0 else "-", "이 시세 미만 매도 시 이득")
+            w3.metric(
+                f"📈 지금({cur_watch_init:,.0f}P) 매도 시",
+                f"{unrealized_eok:+.2f}억" if held_mp > 0 else "-",
+                f"회수 {eval_meso_eok:.2f}억 ({unrealized_pct:+.1f}%)" if held_mp > 0 else "보유 메포 없음"
+            )
+            w4.metric("👑 누적 실현 차익", f"{realized_profit_eok:+.2f}억", f"누적 수수료 -{int(round(total_fee_mp)):,}P")
+            w5.metric("🛒 타섭/템구매 메포 지출", f"-{int(round(total_spent_mp)):,} P", f"평단 환산 약 {total_spent_meso_eok:.2f}억")
 
         col_mm_left, col_mm_right = st.columns([1.15, 1.25], gap="large")
 
         with col_mm_left:
             with st.container(border=True):
-                st.markdown("##### 📝 1. 오늘 메소마켓 시세 기록하기 (단순 시세 관측 일지)")
-                r_c1, r_c2, r_c3 = st.columns([1.2, 1.3, 1.5])
-                with r_c1:
-                    log_date = st.text_input("관측 날짜", value=datetime.now(KST).strftime("%Y-%m-%d %H:%M"), key="mm_log_dt")
-                with r_c2:
-                    log_rate = st.number_input("1억 메소당 메포 시세", min_value=500.0, value=float(mm_cfg.get("current_watch_rate", 2400.0)), step=20.0, format="%.0f", key="mm_log_rt")
-                with r_c3:
-                    log_memo = st.text_input("시세 메모 (선택)", placeholder="예: 썬데이, 방학패치 전, 사료배포", key="mm_log_mm")
+                st.markdown("##### 📝 1. 메소마켓 체결 · 타섭 메포 지출 등록")
+                tx_type = st.radio(
+                    "등록 유형 선택",
+                    [
+                        "🔵 메포 매수 (메소 판매 · 수수료 1%)",
+                        "🔴 메포 매도 (메소 구매 · 수수료 0%)",
+                        "🛒 메포 지출 (타섭[W] 수수료/가위/템구매)"
+                    ],
+                    horizontal=False,
+                    key="mm_tx_type_radio"
+                )
 
-                if st.button("➕ 오늘 시세 일지에 기록 저장", type="primary", use_container_width=True):
-                    new_lid = max([x.get("id", 0) for x in rate_logs], default=0) + 1
-                    rate_logs.append({
-                        "id": new_lid, "날짜": log_date,
-                        "시세(1억당메포)": float(log_rate), "메모": log_memo.strip()
-                    })
-                    mm_cfg["current_watch_rate"] = float(log_rate)
-                    save_json_local(MAPLE_FILE, mp_data)
-                    st.session_state.mp_dirty = True
-                    st.session_state.mp_editor_ver += 1
-                    st.toast(f"✅ 메소마켓 시세(1억당 {int(log_rate):,} 메포)가 기록되었습니다!")
-                    st.rerun()
+                if "지출" in tx_type:
+                    sp_c1, sp_c2 = st.columns([1.1, 1.5])
+                    with sp_c1:
+                        spend_mp_in = st.number_input("차감된 메이플포인트 (P)", min_value=1, value=2000, step=100, key="mm_spend_mp")
+                    with sp_c2:
+                        spend_memo_in = st.text_input("지출 사유 메모", placeholder="예: 타섭[W] 22성 앱솔 구매 10% 수수료", key="mm_spend_memo")
+                    est_sp_eok = (spend_mp_in / avg_held_rate) if avg_held_rate > 0 else (spend_mp_in / max(100.0, cur_watch_init))
+                    st.caption(f"👉 보유 잔고에서 **`-{spend_mp_in:,} P`** 차감 (현재 평단 기준 약 **`{est_sp_eok:.2f}억 메소`** 가치)")
+                    if st.button("🛒 메포 지출 등록 (보유 잔고 차감)", type="primary", use_container_width=True):
+                        new_mm_id = max([x.get("id", 0) for x in mm_list], default=0) + 1
+                        mm_list.append({
+                            "id": new_mm_id, "날짜": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
+                            "구분": "🛒 메포 지출", "환율(1억당메포)": 0.0, "메소(억)": 0.0,
+                            "수수료율(%)": 0.0, "총메이플포인트": int(spend_mp_in),
+                            "메모": spend_memo_in.strip() or "타섭/템구매 메포 사용", "삭제": False
+                        })
+                        save_json_local(MAPLE_FILE, mp_data)
+                        st.session_state.mp_dirty = True
+                        st.session_state.mp_editor_ver += 1
+                        st.toast(f"🛒 메포 {spend_mp_in:,}P 지출이 반영되어 보유 잔고가 차감되었습니다!")
+                        st.rerun()
+                else:
+                    is_buy_mp = "매수" in tx_type
+                    tx_c1, tx_c2, tx_c3 = st.columns(3)
+                    with tx_c1:
+                        mm_rate_in = st.number_input("체결 시세 (1억당 P)", min_value=500.0, value=float(mm_cfg.get("current_watch_rate", 2400.0)), step=10.0, format="%.0f", key="mm_tx_rate")
+                    with tx_c2:
+                        mm_eok_in = st.number_input("거래 규모 (억 메소)", min_value=0.1, value=10.0, step=1.0, format="%.1f", key="mm_tx_eok")
+                    with tx_c3:
+                        default_tx_fee = 1.0 if is_buy_mp else 0.0
+                        mm_fee_in = st.number_input("수수료율 (%)", min_value=0.0, max_value=10.0, value=default_tx_fee, step=0.5, format="%.1f", key=f"mm_tx_fee_{is_buy_mp}")
+
+                    tx_memo_in = st.text_input("거래 메모 (선택)", placeholder="예: 썬데이 전 분할매수 / 기존 보유분 등록(수수료 0%)", key="mm_tx_memo")
+                    add_to_rate_log = st.checkbox("📊 이 체결 시세를 시세 일지(AI 평균 데이터)에도 자동 추가하기", value=True, key="mm_auto_log")
+
+                    gross_p = mm_rate_in * mm_eok_in
+                    net_p = int(round(gross_p * (1.0 - mm_fee_in / 100.0)))
+                    fee_p_val = int(round(gross_p - net_p))
+                    if is_buy_mp:
+                        eff_r = net_p / mm_eok_in if mm_eok_in > 0 else 0.0
+                        st.caption(f"👉 수수료 `-{fee_p_val:,} P` 공제 후 **실수령 `+{net_p:,} P`** (실질 평단가 **`{eff_r:,.0f} P/억`**)")
+                    else:
+                        est_prof_txt = ""
+                        if avg_held_rate > 0:
+                            est_pf = mm_eok_in - (net_p / avg_held_rate)
+                            est_prof_txt = f" | 예상 실현손익 **`{est_pf:+.2f}억`**"
+                        st.caption(f"👉 소모 메포 **`-{net_p:,} P`** → 회수 메소 **`+{mm_eok_in:.1f}억`**{est_prof_txt}")
+
+                    btn_txt = "🔵 메포 매수 등록 (잔고 증가)" if is_buy_mp else "🔴 메포 매도 등록 (잔고 차감 · 손익 정산)"
+                    if st.button(btn_txt, type="primary", use_container_width=True):
+                        now_ts = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
+                        new_mm_id = max([x.get("id", 0) for x in mm_list], default=0) + 1
+                        short_gubun = "🔵 메포 매수" if is_buy_mp else "🔴 메포 매도"
+                        mm_list.append({
+                            "id": new_mm_id, "날짜": now_ts, "구분": short_gubun,
+                            "환율(1억당메포)": float(mm_rate_in), "메소(억)": float(mm_eok_in),
+                            "수수료율(%)": float(mm_fee_in), "총메이플포인트": int(net_p),
+                            "메모": tx_memo_in.strip(), "삭제": False
+                        })
+                        if add_to_rate_log:
+                            new_lid = max([x.get("id", 0) for x in rate_logs], default=0) + 1
+                            auto_m = f"[체결] {short_gubun} {mm_eok_in:.1f}억" + (f" ({tx_memo_in.strip()})" if tx_memo_in.strip() else "")
+                            rate_logs.append({
+                                "id": new_lid, "날짜": now_ts,
+                                "시세(1억당메포)": float(mm_rate_in), "메모": auto_m
+                            })
+                            mm_cfg["current_watch_rate"] = float(mm_rate_in)
+                        save_json_local(MAPLE_FILE, mp_data)
+                        st.session_state.mp_dirty = True
+                        st.session_state.mp_editor_ver += 1
+                        st.toast(f"✅ {short_gubun} ({net_p:,}P) 장부 등록 완료!" + (" (시세 일지 자동 반영)" if add_to_rate_log else ""))
+                        st.rerun()
 
                 st.divider()
-                st.markdown("##### ⚙️ 2. 외부 요인(인플레/패치/이벤트) 과거 기준선 `%` 일괄 보정")
-                s_c1, s_c2 = st.columns(2)
+                st.markdown("##### 📌 2. 거래 없이 단순 시세만 관측 기록하기")
+                r_c1, r_c2, r_c3 = st.columns([1.2, 1.3, 1.1])
+                with r_c1:
+                    log_rate = st.number_input("관측 시세(1억당 P)", min_value=500.0, value=float(mm_cfg.get("current_watch_rate", 2400.0)), step=20.0, format="%.0f", key="mm_log_rt")
+                with r_c2:
+                    log_memo = st.text_input("관측 메모", placeholder="예: 썬데이, 사료배포", key="mm_log_mm")
+                with r_c3:
+                    st.write("")
+                    if st.button("➕ 시세만 기록", use_container_width=True):
+                        new_lid = max([x.get("id", 0) for x in rate_logs], default=0) + 1
+                        rate_logs.append({
+                            "id": new_lid, "날짜": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
+                            "시세(1억당메포)": float(log_rate), "메모": log_memo.strip()
+                        })
+                        mm_cfg["current_watch_rate"] = float(log_rate)
+                        save_json_local(MAPLE_FILE, mp_data)
+                        st.session_state.mp_dirty = True
+                        st.session_state.mp_editor_ver += 1
+                        st.toast(f"✅ 관측 시세(1억당 {int(log_rate):,} P)가 기록되었습니다!")
+                        st.rerun()
+
+        with col_mm_right:
+            with st.container(border=True):
+                st.markdown("##### 🤖 3. 외부요인 `%` 보정 & 보유 평단가 연동 AI 매매 판독기")
+                s_c1, s_c2, s_c3 = st.columns(3)
                 with s_c1:
                     shift_pct = st.number_input(
-                        "🎚️ 과거 기준선 일괄 변동률 (%)",
+                        "🎚️ 과거 기준선 보정 (%)",
                         min_value=-80.0, max_value=200.0, value=float(mm_cfg.get("shift_pct", 0.0)), step=1.0, format="%.1f"
                     )
                 with s_c2:
                     band_th = st.number_input(
-                        "🎯 매수/매도 추천 민감도 (±%)",
+                        "🎯 추천 민감도 (±%)",
                         min_value=1.0, max_value=30.0, value=float(mm_cfg.get("band_threshold", 5.0)), step=0.5, format="%.1f"
                     )
-
-                cur_watch = st.number_input(
-                    "🔍 지금 당장 판독할 현재 인게임 메소마켓 시세 (1억당 메포)",
-                    min_value=500.0, value=float(mm_cfg.get("current_watch_rate", 2400.0)), step=20.0, format="%.0f"
-                )
+                with s_c3:
+                    cur_watch = st.number_input(
+                        "🔍 현재 인게임 시세(P)",
+                        min_value=500.0, value=float(mm_cfg.get("current_watch_rate", 2400.0)), step=20.0, format="%.0f"
+                    )
 
                 if (shift_pct != mm_cfg.get("shift_pct") or band_th != mm_cfg.get("band_threshold") or cur_watch != mm_cfg.get("current_watch_rate")):
                     mm_cfg["shift_pct"] = shift_pct
@@ -2609,12 +2783,25 @@ with tab_maple:
                     save_json_local(MAPLE_FILE, mp_data)
                     st.session_state.mp_dirty = True
 
-        with col_mm_right:
-            with st.container(border=True):
-                st.markdown("##### 🤖 3. AI 메소마켓 매수/매도 타이밍 판독 결과")
+                # (A) 보유 평단가 기반 매도 판정
+                if held_mp > 0 and avg_held_rate > 0:
+                    cur_eval_eok = held_mp / cur_watch
+                    cur_diff_eok = cur_eval_eok - cost_meso_eok
+                    cur_diff_pct = (cur_diff_eok / cost_meso_eok) * 100.0
+                    if cur_watch < avg_held_rate:
+                        st.success(
+                            f"💰 **[내 보유 평단가 판정: 매도 수익 구간!]** 현재 시세(`{cur_watch:,.0f} P`)가 내 실질 본전선(`{avg_held_rate:,.0f} P`)보다 낮습니다.\n\n"
+                            f"👉 보유 중인 **`{int(round(held_mp)):,} P`**를 지금 전량 매도하면 **`{cur_eval_eok:.2f}억 메소`** 회수 (**`+{cur_diff_eok:.2f}억 / +{cur_diff_pct:.1f}%`** 순이익)!"
+                        )
+                    else:
+                        st.warning(
+                            f"⏳ **[내 보유 평단가 판정: 본전 미달 — 대기 권장]** 현재 시세(`{cur_watch:,.0f} P`)가 내 실질 본전선(`{avg_held_rate:,.0f} P`) 이상입니다.\n\n"
+                            f"👉 지금 팔면 **`{cur_diff_eok:.2f}억 ({cur_diff_pct:.1f}%)`** 손실! **`{avg_held_rate:,.0f} P` 미만**으로 내려올 때 매도하세요."
+                        )
 
+                # (B) 시세 일지(체결 기록 포함) 기반 시장 흐름 판독
                 if not rate_logs:
-                    st.info("왼쪽에서 시세 기록을 1개 이상 추가하시면 AI 기준선 분석이 시작됩니다.")
+                    st.info("시세 일지나 매수/매도 체결을 1건 이상 등록하시면 시장 평균 기준선 분석이 시작됩니다.")
                 else:
                     shift_mult = 1.0 + (shift_pct / 100.0)
                     raw_rates = [float(x["시세(1억당메포)"]) for x in rate_logs]
@@ -2630,38 +2817,102 @@ with tab_maple:
                     diff_pct_from_adj = ((cur_watch - adj_avg) / adj_avg) * 100.0 if adj_avg > 0 else 0.0
 
                     k_m1, k_m2, k_m3 = st.columns(3)
-                    k_m1.metric("과거 원본 평균 시세", f"{raw_avg:,.0f} P", f"기록 {len(raw_rates)}건")
-                    k_m2.metric(f"보정된 기준 평균 ({shift_pct:+.1f}%)", f"{adj_avg:,.0f} P", f"범위: {adj_min:,.0f}~{adj_max:,.0f}P")
-                    k_m3.metric("오늘 시세 vs 보정 평균", f"{cur_watch:,.0f} P", f"{diff_pct_from_adj:+.1f}% 차이")
+                    k_m1.metric("시세 기록 평균", f"{raw_avg:,.0f} P", f"누적 {len(raw_rates)}건")
+                    k_m2.metric(f"보정 기준 평균 ({shift_pct:+.1f}%)", f"{adj_avg:,.0f} P", f"범위: {adj_min:,.0f}~{adj_max:,.0f}P")
+                    k_m3.metric("현재 vs 보정 평균", f"{cur_watch:,.0f} P", f"{diff_pct_from_adj:+.1f}% 차이")
 
                     st.info(
-                        f"🎯 **현재 외부요인({shift_pct:+.1f}%) 반영 AI 매매 가이드라인:**\n"
-                        f"- 🔵 **메포 매수 추천선 (메소 팔아 메포 사기):** 1억당 **`{buy_mp_trigger:,.0f} 메포` 이상**일 때\n"
-                        f"- ⚪ **관망(대기) 구간:** 1억당 **`{sell_mp_trigger:,.0f} ~ {buy_mp_trigger:,.0f} 메포`** 사이\n"
-                        f"- 🔴 **메포 매도 추천선 (메포 팔아 메소 확보):** 1억당 **`{sell_mp_trigger:,.0f} 메포` 이하**일 때"
+                        f"🎯 **시장 시세 데이터({len(raw_rates)}건 · 보정 {shift_pct:+.1f}%) 가이드라인:**\n"
+                        f"- 🔵 **메포 분할 매수 추천 (메소 판매):** **`{buy_mp_trigger:,.0f} P` 이상**일 때\n"
+                        f"- ⚪ **관망 구간:** **`{sell_mp_trigger:,.0f} ~ {buy_mp_trigger:,.0f} P`** 사이\n"
+                        f"- 🔴 **메포 매도 추천 (메소 회수):** **`{sell_mp_trigger:,.0f} P` 이하**일 때"
                     )
 
                     if cur_watch >= buy_mp_trigger:
-                        st.success(
-                            f"🔵 **[AI 강력 추천: 지금 메소를 팔아 '메이플포인트'를 매수하세요!]**\n\n"
-                            f"현재 시세(`{cur_watch:,.0f} P`)가 보정된 과거 평균(`{adj_avg:,.0f} P`)보다 **`+{diff_pct_from_adj:.1f}%` 높은 고점**입니다!"
-                        )
+                        st.success(f"🔵 **[시장 시세 판정]** 보정 평균 대비 **`+{diff_pct_from_adj:.1f}%` 고점** — 메소를 팔아 **메포를 모아두기 좋은 타이밍**입니다!")
                     elif cur_watch <= sell_mp_trigger:
-                        st.error(
-                            f"🔴 **[AI 강력 추천: 지금 보유한 '메이플포인트'를 팔아 메소를 확보하세요!]**\n\n"
-                            f"현재 시세(`{cur_watch:,.0f} P`)가 보정된 과거 평균(`{adj_avg:,.0f} P`)보다 **`{diff_pct_from_adj:.1f}%` 낮은 저점(메포 가치 폭등)**입니다!"
-                        )
+                        st.error(f"🔴 **[시장 시세 판정]** 보정 평균 대비 **`{diff_pct_from_adj:.1f}%` 저점** — 보유 메포를 팔아 **메소를 회수하기 좋은 타이밍**입니다!")
                     else:
-                        st.warning(
-                            f"🟡 **[AI 판정: 중립 / 관망 구간입니다]**\n\n"
-                            f"현재 시세(`{cur_watch:,.0f} P`)가 보정 평균(`{adj_avg:,.0f} P`) 근처(`{diff_pct_from_adj:+.1f}%`)에서 움직이고 있습니다."
-                        )
+                        st.caption(f"🟡 **[시장 시세 판정]** 보정 평균(`{adj_avg:,.0f} P`) 근처 중립 구간입니다.")
 
         st.divider()
-        sub_c1, sub_c2 = st.columns(2, gap="large")
+        sub_c1, sub_c2 = st.columns([1.35, 1.0], gap="large")
 
         with sub_c1:
-            st.markdown("##### 📊 꾸준히 기록한 메소마켓 시세 일지")
+            st.markdown("##### 🧾 내 메소마켓 체결 & 타섭 메포 지출 장부 (수수료·평단가 자동 반영)")
+            if not mm_list:
+                st.info("아직 등록된 체결·지출 내역이 없습니다. 위에서 첫 매수나 지출을 등록해 보세요!")
+            else:
+                mm_rows = []
+                for x in sorted(mm_list, key=lambda i: i.get("id", 0), reverse=True):
+                    tid = x.get("id", 0)
+                    meta = row_calc_meta.get(tid, {"net_mp": int(x.get("총메이플포인트", 0)), "fee_p": float(x.get("수수료율(%)", 0.0)), "note": ""})
+                    mm_rows.append({
+                        "id": tid,
+                        "일시": str(x.get("날짜", "")),
+                        "구분": str(x.get("구분", "")),
+                        "환율(1억당메포)": float(x.get("환율(1억당메포)", 0.0)),
+                        "메소(억)": float(x.get("메소(억)", 0.0)),
+                        "수수료율(%)": float(meta["fee_p"]),
+                        "실수령/사용메포(P)": int(meta["net_mp"]),
+                        "손익/환산": meta["note"],
+                        "메모": str(x.get("메모", "")),
+                        "삭제": False
+                    })
+                edited_mm = st.data_editor(
+                    pd.DataFrame(mm_rows),
+                    column_config={
+                        "id": None,
+                        "일시": st.column_config.TextColumn("일시", width="small"),
+                        "구분": st.column_config.TextColumn("구분", width="small", disabled=True),
+                        "환율(1억당메포)": st.column_config.NumberColumn("✏️ 시세(P)", min_value=0.0, step=10.0, format="%d P"),
+                        "메소(억)": st.column_config.NumberColumn("✏️ 규모(억)", min_value=0.0, step=1.0, format="%.1f억"),
+                        "수수료율(%)": st.column_config.NumberColumn("✏️ 수수료%", min_value=0.0, max_value=10.0, step=0.5, format="%.1f%%"),
+                        "실수령/사용메포(P)": st.column_config.NumberColumn("✏️ 메포(P)", min_value=0, step=100, format="%d P"),
+                        "손익/환산": st.column_config.TextColumn("자동 정산", width="medium", disabled=True),
+                        "메모": st.column_config.TextColumn("✏️ 메모", width="small"),
+                        "삭제": st.column_config.CheckboxColumn("🗑️", width="small")
+                    },
+                    use_container_width=True, hide_index=True, key=f"mp_mm_ed_{st.session_state.mp_editor_ver}"
+                )
+                mm_map = {x["id"]: x for x in mm_list}
+                mm_chg = False
+                for _, r in edited_mm.iterrows():
+                    orig_m = mm_map.get(int(r["id"]))
+                    if not orig_m: continue
+                    if bool(r["삭제"]):
+                        mm_list.remove(orig_m); mm_chg = True; continue
+                    gubun_o = str(orig_m.get("구분", ""))
+                    new_dt = str(r["일시"])
+                    new_rt = float(r["환율(1억당메포)"])
+                    new_ek = float(r["메소(억)"])
+                    new_fe = float(r["수수료율(%)"])
+                    new_mp = int(r["실수령/사용메포(P)"])
+                    new_mm = str(r["메모"]) if not pd.isna(r["메모"]) else ""
+
+                    if "지출" in gubun_o:
+                        if (new_dt != orig_m.get("날짜", "") or new_mp != int(orig_m.get("총메이플포인트", 0)) or new_mm != orig_m.get("메모", "")):
+                            orig_m["날짜"] = new_dt
+                            orig_m["총메이플포인트"] = new_mp
+                            orig_m["메모"] = new_mm
+                            mm_chg = True
+                    else:
+                        calc_mp = int(round(new_rt * new_ek * (1.0 - new_fe / 100.0)))
+                        if (new_dt != orig_m.get("날짜", "") or new_rt != float(orig_m.get("환율(1억당메포)", 0.0)) or
+                            new_ek != float(orig_m.get("메소(억)", 0.0)) or new_fe != float(orig_m.get("수수료율(%)", 1.0 if "매수" in gubun_o else 0.0)) or
+                            new_mm != orig_m.get("메모", "")):
+                            orig_m["날짜"] = new_dt
+                            orig_m["환율(1억당메포)"] = new_rt
+                            orig_m["메소(억)"] = new_ek
+                            orig_m["수수료율(%)"] = new_fe
+                            orig_m["총메이플포인트"] = calc_mp
+                            orig_m["메모"] = new_mm
+                            mm_chg = True
+                if mm_chg:
+                    save_json_local(MAPLE_FILE, mp_data); st.session_state.mp_dirty = True; st.session_state.mp_editor_ver += 1; st.rerun()
+
+        with sub_c2:
+            st.markdown("##### 📊 시세 일지 (관측 + 체결 자동 누적 데이터)")
             if rate_logs:
                 shift_mult = 1.0 + (float(mm_cfg.get("shift_pct", 0.0)) / 100.0)
                 log_rows = []
@@ -2677,9 +2928,9 @@ with tab_maple:
                     column_config={
                         "id": None, "날짜": st.column_config.TextColumn("✏️ 날짜", width="small"),
                         "시세(1억당메포)": st.column_config.NumberColumn("✏️ 기록 시세", format="%d P"),
-                        "보정환산시세": st.column_config.NumberColumn(f"보정 시세({mm_cfg.get('shift_pct',0):+.1f}%)", format="%d P", disabled=True),
+                        "보정환산시세": st.column_config.NumberColumn(f"보정({mm_cfg.get('shift_pct',0):+.1f}%)", format="%d P", disabled=True),
                         "메모": st.column_config.TextColumn("✏️ 메모", width="medium"),
-                        "삭제": st.column_config.CheckboxColumn("🗑️삭제", width="small")
+                        "삭제": st.column_config.CheckboxColumn("🗑️", width="small")
                     },
                     use_container_width=True, hide_index=True, key=f"mm_rate_log_ed_{st.session_state.mp_editor_ver}"
                 )
@@ -2696,58 +2947,6 @@ with tab_maple:
                         orig_l["메모"] = str(r["메모"])
                         l_chg = True
                 if l_chg:
-                    save_json_local(MAPLE_FILE, mp_data); st.session_state.mp_dirty = True; st.session_state.mp_editor_ver += 1; st.rerun()
-
-        with sub_c2:
-            st.markdown("##### 🧾 내 실제 메소마켓 매수/매도 체결 장부 (선택 사용)")
-            mm_list = mp_data["meso_market"]
-            t_c1, t_c2, t_c3, t_c4 = st.columns([1.5, 1.2, 1.2, 1.1])
-            with t_c1:
-                mm_action = st.selectbox("체결 구분", ["🔵 메포 매수", "🔴 메포 매도"], label_visibility="collapsed")
-            with t_c2:
-                mm_rate = st.number_input("체결 시세(P)", min_value=500.0, value=float(mm_cfg.get("current_watch_rate", 2400.0)), step=20.0, format="%.0f", label_visibility="collapsed")
-            with t_c3:
-                mm_eok = st.number_input("억 메소", min_value=0.1, value=10.0, step=1.0, format="%.1f", label_visibility="collapsed")
-            with t_c4:
-                if st.button("➕ 체결 등록", use_container_width=True):
-                    new_mm_id = max([x.get("id", 0) for x in mm_list], default=0) + 1
-                    mm_list.append({
-                        "id": new_mm_id, "날짜": datetime.now(KST).strftime("%m/%d %H:%M"),
-                        "구분": mm_action, "환율(1억당메포)": float(mm_rate),
-                        "메소(억)": float(mm_eok), "총메이플포인트": int(mm_rate * mm_eok), "삭제": False
-                    })
-                    save_json_local(MAPLE_FILE, mp_data); st.session_state.mp_dirty = True; st.rerun()
-
-            if mm_list:
-                mm_df = pd.DataFrame(mm_list)
-                for col in ["id", "날짜", "구분", "환율(1억당메포)", "메소(억)", "총메이플포인트", "삭제"]:
-                    if col not in mm_df.columns:
-                        mm_df[col] = False if col == "삭제" else 0
-                edited_mm = st.data_editor(
-                    mm_df[["id", "날짜", "구분", "환율(1억당메포)", "메소(억)", "총메이플포인트", "삭제"]],
-                    column_config={
-                        "id": None, "날짜": st.column_config.TextColumn("일시", width="small"),
-                        "구분": st.column_config.TextColumn("구분", width="small"),
-                        "환율(1억당메포)": st.column_config.NumberColumn("✏️ 체결시세", format="%d P"),
-                        "메소(억)": st.column_config.NumberColumn("✏️ 규모(억)", format="%.1f억"),
-                        "총메이플포인트": st.column_config.NumberColumn("총 메포", format="%d P", disabled=True),
-                        "삭제": st.column_config.CheckboxColumn("🗑️", width="small")
-                    },
-                    use_container_width=True, hide_index=True, key=f"mp_mm_ed_{st.session_state.mp_editor_ver}"
-                )
-                mm_map = {x["id"]: x for x in mm_list}
-                mm_chg = False
-                for _, r in edited_mm.iterrows():
-                    orig_m = mm_map.get(int(r["id"]))
-                    if not orig_m: continue
-                    if bool(r["삭제"]):
-                        mm_list.remove(orig_m); mm_chg = True; continue
-                    if float(r["환율(1억당메포)"]) != float(orig_m["환율(1억당메포)"]) or float(r["메소(억)"]) != float(orig_m["메소(억)"]):
-                        orig_m["환율(1억당메포)"] = float(r["환율(1억당메포)"])
-                        orig_m["메소(억)"] = float(r["메소(억)"])
-                        orig_m["총메이플포인트"] = int(orig_m["환율(1억당메포)"] * orig_m["메소(억)"])
-                        mm_chg = True
-                if mm_chg:
                     save_json_local(MAPLE_FILE, mp_data); st.session_state.mp_dirty = True; st.session_state.mp_editor_ver += 1; st.rerun()
 
     # --------------------------------------------------------------------------
@@ -3111,7 +3310,6 @@ with tab_maple:
 
         g_col1, g_col2 = st.columns(2, gap="large")
 
-        # 왼쪽 컬럼: 2. 무기 1~5추옵 자동 판독기 + 3. 무기 옵션 우선순위 & 시장 가치 판독기
         with g_col1:
             with st.container(border=True):
                 st.markdown("##### ⚔️ 2. 무기 '1추옵 ~ 5추옵' 실시간 자동 판독기")
@@ -3236,7 +3434,6 @@ with tab_maple:
                 ])
                 st.dataframe(prio_df, use_container_width=True, hide_index=True)
 
-        # 오른쪽 컬럼: 4. 주문서 작 역산 판독기 + 5. 대장장이/합성/토드 & 은어 사전
         with g_col2:
             with st.container(border=True):
                 st.markdown("##### 📜 4. 경매장 완제품 '주문서 작' 실시간 역산 판독기")

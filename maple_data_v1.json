@@ -1,6 +1,6 @@
 {
   "last_weekly_reset": "2026-11-19T18:49:33.610900+09:00",
-  "last_daily_date": "2026-11-23",
+  "last_daily_date": "2026-11-25",
   "fee_rate": 0.05,
   "accounts": [
     {
@@ -156,12 +156,18 @@
       "날짜": "2026-11-23 23:28",
       "시세(1억당메포)": 2158.0,
       "메모": "[체결] 🔵 메포 매수 7.0억"
+    },
+    {
+      "id": 6,
+      "날짜": "2026-11-25 00:03",
+      "시세(1억당메포)": 2182.0,
+      "메모": ""
     }
   ],
   "meso_market_cfg": {
     "shift_pct": 0.0,
     "band_threshold": 5.0,
-    "current_watch_rate": 2158.0
+    "current_watch_rate": 2182.0
   },
   "jokbo_shift_pct": 0.0
 }

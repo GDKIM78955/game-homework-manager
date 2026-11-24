@@ -1,5 +1,5 @@
 {
-  "last_daily_date": "2026-11-24",
+  "last_daily_date": "2026-11-25",
   "daily_tasks": {
     "quest": false,
     "factory": false,
@@ -130,6 +130,17 @@
       "buy_price": 560.0,
       "qty": 1,
       "buy_date": "2026-11-24 11:40",
+      "status": "보유중",
+      "sell_price": 0.0,
+      "sell_date": "",
+      "net_profit": 0.0
+    },
+    {
+      "id": 11,
+      "item_name": "뇌전의 기운이 서린뿔",
+      "buy_price": 592.0,
+      "qty": 25,
+      "buy_date": "2026-11-25 02:25",
       "status": "보유중",
       "sell_price": 0.0,
       "sell_date": "",
